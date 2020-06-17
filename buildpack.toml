@@ -3,7 +3,7 @@ api = "0.2"
 [buildpack]
   id = "com.anynines.buildpacks.rvm-bundler"
   name = "RVM Buildpack for Bundler"
-  version = "0.0.1"
+  version = "0.0.2"
 
 [metadata]
   include_files = ["bin/build","bin/detect","buildpack.toml"]

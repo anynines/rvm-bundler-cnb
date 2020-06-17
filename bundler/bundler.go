@@ -46,6 +46,12 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	if lockCacheEqual && bundlerLayer.Metadata["gemfile_sha256"] != nil &&
 		bundlerLayer.Metadata["gemfile_sha256"].(string) == fmt.Sprintf("%x", gemfileSHA256) {
 		logger.Process("Reusing cached layer %s", bundlerLayer.Path)
+
+		err = configureBundlerPath(context, bundlerLayer)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
 		return packit.BuildResult{
 			Plan: context.Plan,
 			Layers: []packit.Layer{
@@ -89,15 +95,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	bundleConfigCmd := strings.Join([]string{
-		"bundle",
-		"config",
-		"set",
-		"--local",
-		"path",
-		bundlerLayer.Path,
-	}, " ")
-	err = RunBashCmd(bundleConfigCmd, context)
+	err = configureBundlerPath(context, bundlerLayer)
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
@@ -180,4 +178,20 @@ func bundlerVersion(context packit.BuildContext, configuration Configuration) st
 		}
 	}
 	return bundlerVersion
+}
+
+func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer) error {
+	bundleConfigCmd := strings.Join([]string{
+		"bundle",
+		"config",
+		"set",
+		"--local",
+		"path",
+		bundlerLayer.Path,
+	}, " ")
+	err := RunBashCmd(bundleConfigCmd, context)
+	if err != nil {
+		return err
+	}
+	return nil
 }
