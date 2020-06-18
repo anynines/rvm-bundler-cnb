@@ -45,11 +45,10 @@ func InstallPuma(context packit.BuildContext, configuration Configuration, logge
 		}
 		defer configPumaRb.Close()
 
-		configPumaRb.Write([]byte(fmt.Sprintf("binds: %s\n", configuration.Puma.Bind)))
-		configPumaRb.Write([]byte(fmt.Sprintf("workers: %d\n", configuration.Puma.Workers)))
-		configPumaRb.Write([]byte(fmt.Sprintf("min_threads: %d\n", configuration.Puma.Threads)))
-		configPumaRb.Write([]byte(fmt.Sprintf("max_threads: %d\n", configuration.Puma.Threads)))
-		configPumaRb.Write([]byte(fmt.Sprintf("log_requests: true\n")))
+		configPumaRb.Write([]byte(fmt.Sprintf("bind '%s'\n", configuration.Puma.Bind)))
+		configPumaRb.Write([]byte(fmt.Sprintf("workers %d\n", configuration.Puma.Workers)))
+		configPumaRb.Write([]byte(fmt.Sprintf("threads %d, %d\n", configuration.Puma.Threads, configuration.Puma.Threads)))
+		configPumaRb.Write([]byte(fmt.Sprintf("log_requests true\n")))
 		if configuration.Puma.Preload {
 			configPumaRb.Write([]byte(fmt.Sprintf("preload_app!\n")))
 		}
