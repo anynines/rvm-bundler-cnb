@@ -181,13 +181,13 @@ func RunBashCmd(command string, context packit.BuildContext) error {
 
 	if err != nil {
 		logger.Subprocess("Command failed: %s", cmd.String())
-		logger.Subprocess("Command stderr: %s", stdErrBytes.String())
+		logger.Subprocess("Command stderr:\n\n%s", stdErrBytes.String())
 		logger.Subprocess("Error status code: %s", err.Error())
 		return err
 	}
 
 	logger.Subprocess("Command succeeded: %s", cmd.String())
-	logger.Subprocess("Command output: %s", stdOutBytes.String())
+	logger.Subprocess("Command output:\n\n%s", stdOutBytes.String())
 
 	return nil
 }
