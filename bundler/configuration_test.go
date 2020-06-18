@@ -59,6 +59,14 @@ func testConfiguration(t *testing.T, context spec.G, it spec.S) {
 			Expect(err).NotTo(HaveOccurred())
 			Expect(configuration).To(Equal(bundler.Configuration{
 				DefaultBundlerVersion: "2.1.4",
+				InstallPuma:           true,
+				Puma: bundler.Puma{
+					Version: "4.3.5",
+					Bind:    "tcp://0.0.0.0:8080",
+					Workers: 5,
+					Threads: 5,
+					Preload: true,
+				},
 			}))
 		})
 

@@ -52,12 +52,24 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 			return packit.BuildResult{}, err
 		}
 
-		return packit.BuildResult{
+		err = InstallPuma(context, configuration, logger)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
+		buildResult := packit.BuildResult{
 			Plan: context.Plan,
 			Layers: []packit.Layer{
 				bundlerLayer,
 			},
-		}, nil
+		}
+
+		pumaProcess, err := CreatePumaProcess(context, configuration, logger)
+		if err == nil && pumaProcess.Type == "web" && pumaProcess.Command != "" {
+			buildResult.Processes = append(buildResult.Processes, pumaProcess)
+		}
+
+		return buildResult, nil
 	}
 
 	logger.Process("Installing Bundler version '%s'", bundlerVersion(context, configuration))
@@ -115,12 +127,23 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	}
 	bundlerLayer.Metadata["gemfile_lock_sha256"] = fmt.Sprintf("%x", sha256.Sum256(gemfileLockContentsInstalled))
 
-	return packit.BuildResult{
+	err = InstallPuma(context, configuration, logger)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
+	buildResult := packit.BuildResult{
 		Plan: context.Plan,
 		Layers: []packit.Layer{
 			bundlerLayer,
 		},
-	}, nil
+	}
+
+	pumaProcess, err := CreatePumaProcess(context, configuration, logger)
+	if err == nil && pumaProcess.Type == "web" && pumaProcess.Command != "" {
+		buildResult.Processes = append(buildResult.Processes, pumaProcess)
+	}
+	return buildResult, nil
 }
 
 // RunBashCmd executes a command in an interactive BASH shell
@@ -146,7 +169,6 @@ func RunBashCmd(command string, context packit.BuildContext) error {
 	cmd.Env = os.Environ()
 
 	logger.Process("Executing: %s", strings.Join(cmd.Args, " "))
-	logger.Subprocess("Environment variables:\n%s", strings.Join(cmd.Env, "\n"))
 	logger.Break()
 
 	var stdOutBytes bytes.Buffer

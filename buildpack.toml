@@ -3,13 +3,21 @@ api = "0.2"
 [buildpack]
   id = "com.anynines.buildpacks.rvm-bundler"
   name = "RVM Buildpack for Bundler"
-  version = "0.0.2"
+  version = "0.0.3"
 
 [metadata]
   include_files = ["bin/build","bin/detect","buildpack.toml"]
 
   [metadata.configuration]
     default_bundler_version = "2.1.4"
+
+    install_puma = true
+    [metadata.configuration.puma]
+      version = "4.3.5"
+      bind = "tcp://0.0.0.0:8080"
+      workers = 5
+      threads = 5
+      preload = true
 
 [[stacks]]
   id = "io.buildpacks.stacks.bionic"

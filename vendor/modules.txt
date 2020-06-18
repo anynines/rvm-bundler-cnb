@@ -32,7 +32,7 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/paketo-buildpacks/packit v0.0.14
+# github.com/paketo-buildpacks/packit v0.0.15
 ## explicit
 github.com/paketo-buildpacks/packit
 github.com/paketo-buildpacks/packit/internal
