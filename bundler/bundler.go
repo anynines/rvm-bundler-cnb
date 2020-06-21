@@ -179,7 +179,6 @@ func RunBashCmd(command string, context packit.BuildContext) error {
 	cmd.Env = os.Environ()
 
 	logger.Process("Executing: %s", strings.Join(cmd.Args, " "))
-	logger.Break()
 
 	var stdOutBytes bytes.Buffer
 	cmd.Stdout = &stdOutBytes
@@ -190,15 +189,23 @@ func RunBashCmd(command string, context packit.BuildContext) error {
 	err := cmd.Run()
 
 	if err != nil {
-		logger.Subprocess("Command failed: %s", cmd.String())
-		logger.Subprocess("Command stderr:\n\n%s", stdErrBytes.String())
-		logger.Subprocess("Error status code: %s", err.Error())
+		logger.Process("Command failed: %s", cmd.String())
+		if len(stdErrBytes.String()) > 0 {
+			logger.Process("Command stderr:")
+			logger.Subprocess(stdErrBytes.String())
+		}
+		logger.Process("Error status code: %s", err.Error())
+		logger.Break()
 		return err
 	}
 
-	logger.Subprocess("Command succeeded: %s", cmd.String())
-	logger.Subprocess("Command output:\n\n%s", stdOutBytes.String())
+	logger.Process("Command succeeded: %s", cmd.String())
+	if len(stdOutBytes.String()) > 0 {
+		logger.Process("Command output:")
+		logger.Subprocess(stdOutBytes.String())
+	}
 
+	logger.Break()
 	return nil
 }
 
@@ -243,17 +250,24 @@ func createProfileFile(bundlerLayer packit.Layer, context packit.BuildContext, l
 		return err
 	}
 	if len(pathMatches) > 0 {
-		profileFilePath := filepath.Join(context.WorkingDir, ".profile")
-		logger.Process("Writing .profile to path: '%s'", profileFilePath)
+		profileDPath := filepath.Join(bundlerLayer.Path, "profile.d")
+		err := os.MkdirAll(profileDPath, os.ModePerm)
+		if err != nil {
+			logger.Detail("Creating directory '%s' failed", profileDPath)
+			return err
+		}
 
-		profileFile, err := os.OpenFile(profileFilePath, os.O_RDWR|os.O_CREATE, 0644)
+		gemPathFilePath := filepath.Join(profileDPath, "gem_path_append.sh")
+		logger.Process("Creating script to export GEM_PATH in path: '%s'", gemPathFilePath)
+		gemPathFile, err := os.OpenFile(gemPathFilePath, os.O_RDWR|os.O_CREATE, 0755)
 		if err != nil {
 			return err
 		}
-		defer profileFile.Close()
+		defer gemPathFile.Close()
 
-		exportGemPathString := fmt.Sprintf("export GEM_PATH=\"$GEM_PATH:%s\"\n", pathMatches[0])
-		_, err = profileFile.Write([]byte(exportGemPathString))
+		exportGemPathString := fmt.Sprintf("#!/bin/bash\n")
+		exportGemPathString += fmt.Sprintf("export GEM_PATH=\"$GEM_PATH:%s\"\n", pathMatches[0])
+		_, err = gemPathFile.Write([]byte(exportGemPathString))
 		if err != nil {
 			return err
 		}
