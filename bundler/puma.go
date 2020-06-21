@@ -19,23 +19,8 @@ func InstallPuma(context packit.BuildContext, configuration Configuration, logge
 		return nil
 	}
 
-	logger.Process("Installing Puma version: '%s'", configuration.Puma.Version)
-
-	gemInstallPumaCmd := strings.Join([]string{
-		"gem",
-		"install",
-		"-N",
-		"puma",
-		"-v",
-		configuration.Puma.Version,
-	}, " ")
-	err := RunBashCmd(gemInstallPumaCmd, context)
-	if err != nil {
-		return err
-	}
-
 	configPumaRbPath := filepath.Join(context.WorkingDir, "config", "puma.rb")
-	_, err = os.Stat(configPumaRbPath)
+	_, err := os.Stat(configPumaRbPath)
 	if os.IsNotExist(err) {
 		logger.Process("Creating configuration file for Puma at: '%s'", configPumaRbPath)
 
@@ -45,18 +30,46 @@ func InstallPuma(context packit.BuildContext, configuration Configuration, logge
 		}
 		defer configPumaRb.Close()
 
-		configPumaRb.Write([]byte(fmt.Sprintf("bind '%s'\n", configuration.Puma.Bind)))
-		configPumaRb.Write([]byte(fmt.Sprintf("workers %d\n", configuration.Puma.Workers)))
-		configPumaRb.Write([]byte(fmt.Sprintf("threads %d, %d\n", configuration.Puma.Threads, configuration.Puma.Threads)))
-		configPumaRb.Write([]byte(fmt.Sprintf("log_requests true\n")))
+		configPumaRb.WriteString(fmt.Sprintf("bind '%s'\n", configuration.Puma.Bind))
+		configPumaRb.WriteString(fmt.Sprintf("workers %d\n", configuration.Puma.Workers))
+		configPumaRb.WriteString(fmt.Sprintf("threads %d, %d\n", configuration.Puma.Threads, configuration.Puma.Threads))
+		configPumaRb.WriteString("log_requests true\n")
 		if configuration.Puma.Preload {
-			configPumaRb.Write([]byte(fmt.Sprintf("preload_app!\n")))
+			configPumaRb.WriteString("preload_app!\n")
 		}
-
-		return nil
+		configPumaRb.WriteString("activate_control_app 'unix:///tmp/pumactl.sock', { no_token: true }\n")
 	}
 
 	logger.Process("Using config/puma.rb supplied by application")
+
+	GemfileLock, err := os.Open(filepath.Join(context.WorkingDir, "Gemfile.lock"))
+	if err != nil {
+		return err
+	}
+	defer GemfileLock.Close()
+
+	scanner := bufio.NewScanner(GemfileLock)
+	for scanner.Scan() {
+		if strings.HasPrefix(strings.TrimSpace(scanner.Text()), "puma (") {
+			logger.Process("Puma is present in Gemfile.lock")
+			logger.Break()
+			return nil
+		}
+	}
+
+	logger.Process("Adding Puma version: '%s' to Gemfile", configuration.Puma.Version)
+
+	Gemfile, err := os.OpenFile(filepath.Join(context.WorkingDir, "Gemfile"), os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer Gemfile.Close()
+
+	_, err = Gemfile.WriteString(fmt.Sprintf("\ngem \"puma\", \"%s\"\n", configuration.Puma.Version))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -80,11 +93,11 @@ func CreatePumaProcess(context packit.BuildContext, configuration Configuration,
 	}
 
 	if installPumaCommand {
-		logger.Process("Returning process type 'web' with command 'puma'")
+		logger.Process("Returning process type 'web' with command 'bundle exec puma'")
 
 		return packit.Process{
 			Type:    "web",
-			Command: "puma",
+			Command: "bundle exec puma",
 		}, nil
 	}
 

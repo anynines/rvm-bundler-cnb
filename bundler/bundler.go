@@ -2,9 +2,7 @@ package bundler
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -24,74 +22,20 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	// Assumption: the contents of the Gemfile and the Gemfile.lock files should
-	// be computed to the same SHA256 hashsum between two runs of this CNB, but
-	// the Gemfile.lock may not yet exist. If the Gemfile.lock doesn't exist,
-	// then we definitely cannot re-use this CNB's layer because "bundle install"
-	// was not run yet
-	lockCacheEqual := false
-	if _, err = os.Stat(filepath.Join(context.WorkingDir, "Gemfile.lock")); err == nil &&
-		bundlerLayer.Metadata["gemfile_lock_sha256"] != nil {
-		gemfileLockContents, err := ioutil.ReadFile(filepath.Join(context.WorkingDir, "Gemfile.lock"))
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-		gemfileLockSHA256 := sha256.Sum256(gemfileLockContents)
-		lockCacheEqual = bundlerLayer.Metadata["gemfile_lock_sha256"].(string) == fmt.Sprintf("%x", gemfileLockSHA256)
-	}
-
-	gemfileContents, err := ioutil.ReadFile(filepath.Join(context.WorkingDir, "Gemfile"))
-	gemfileSHA256 := sha256.Sum256(gemfileContents)
-
-	if lockCacheEqual && bundlerLayer.Metadata["gemfile_sha256"] != nil &&
-		bundlerLayer.Metadata["gemfile_sha256"].(string) == fmt.Sprintf("%x", gemfileSHA256) {
-		logger.Process("Reusing cached layer %s", bundlerLayer.Path)
-
-		err = configureBundlerPath(context, bundlerLayer)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		err = InstallPuma(context, configuration, logger)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		err = createProfileFile(bundlerLayer, context, logger)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
-
-		buildResult := packit.BuildResult{
-			Plan: context.Plan,
-			Layers: []packit.Layer{
-				bundlerLayer,
-			},
-		}
-
-		pumaProcess, err := CreatePumaProcess(context, configuration, logger)
-		if err == nil && pumaProcess.Type == "web" && pumaProcess.Command != "" {
-			buildResult.Processes = append(buildResult.Processes, pumaProcess)
-		}
-
-		return buildResult, nil
-	}
-
 	logger.Process("Installing Bundler version '%s'", bundlerVersion(context, configuration))
 
-	if err = bundlerLayer.Reset(); err != nil {
-		logger.Process("Resetting Bundler layer failed")
-		return packit.BuildResult{}, err
-	}
-
 	bundlerLayer.Metadata = map[string]interface{}{
-		"version":        bundlerVersion(context, configuration),
-		"gemfile_sha256": fmt.Sprintf("%x", gemfileSHA256),
+		"version": bundlerVersion(context, configuration),
 	}
 
 	bundlerLayer.Build = true
 	bundlerLayer.Cache = true
 	bundlerLayer.Launch = true
+
+	err = InstallPuma(context, configuration, logger)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
 
 	gemInstallBundlerCmd := strings.Join([]string{
 		"gem",
@@ -126,18 +70,11 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	err = createProfileFile(bundlerLayer, context, logger)
-	if err != nil {
-		return packit.BuildResult{}, err
-	}
-
-	gemfileLockContentsInstalled, err := ioutil.ReadFile(filepath.Join(context.WorkingDir, "Gemfile.lock"))
-	if err != nil {
-		return packit.BuildResult{}, err
-	}
-	bundlerLayer.Metadata["gemfile_lock_sha256"] = fmt.Sprintf("%x", sha256.Sum256(gemfileLockContentsInstalled))
-
-	err = InstallPuma(context, configuration, logger)
+	bundleCleanCmd := strings.Join([]string{
+		"bundle",
+		"clean",
+	}, " ")
+	err = RunBashCmd(bundleCleanCmd, context)
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
@@ -231,46 +168,6 @@ func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer
 	err := RunBashCmd(bundleConfigCmd, context)
 	if err != nil {
 		return err
-	}
-	return nil
-}
-
-// createProfileFile creates a file called ".profile" in the applicaton
-// directory in order to add Bundler's Gem path to the $GEM_PATH variable
-// The .profile file is loaded during launch according to:
-// https://github.com/buildpacks/spec/blob/main/buildpack.md#launch
-func createProfileFile(bundlerLayer packit.Layer, context packit.BuildContext, logger rvm.LogEmitter) error {
-	// the following is a bit "hacky" but I have not yet found a better way to
-	// determine the path where bundler stores its gems because that path name
-	// depends on the Ruby platform. I assume the following will work because
-	// only subdirectory exists in the "ruby" platform directory
-	gemPath := filepath.Join(bundlerLayer.Path, "ruby")
-	pathMatches, err := filepath.Glob(gemPath + string(os.PathSeparator) + "*")
-	if err != nil {
-		return err
-	}
-	if len(pathMatches) > 0 {
-		profileDPath := filepath.Join(bundlerLayer.Path, "profile.d")
-		err := os.MkdirAll(profileDPath, os.ModePerm)
-		if err != nil {
-			logger.Detail("Creating directory '%s' failed", profileDPath)
-			return err
-		}
-
-		gemPathFilePath := filepath.Join(profileDPath, "gem_path_append.sh")
-		logger.Process("Creating script to export GEM_PATH in path: '%s'", gemPathFilePath)
-		gemPathFile, err := os.OpenFile(gemPathFilePath, os.O_RDWR|os.O_CREATE, 0755)
-		if err != nil {
-			return err
-		}
-		defer gemPathFile.Close()
-
-		exportGemPathString := fmt.Sprintf("#!/bin/bash\n")
-		exportGemPathString += fmt.Sprintf("export GEM_PATH=\"$GEM_PATH:%s\"\n", pathMatches[0])
-		_, err = gemPathFile.Write([]byte(exportGemPathString))
-		if err != nil {
-			return err
-		}
 	}
 	return nil
 }
