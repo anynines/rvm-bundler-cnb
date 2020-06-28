@@ -1,8 +1,10 @@
 package bundler
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -117,32 +119,36 @@ func RunBashCmd(command string, context packit.BuildContext) error {
 
 	logger.Process("Executing: %s", strings.Join(cmd.Args, " "))
 
-	var stdOutBytes bytes.Buffer
-	cmd.Stdout = &stdOutBytes
+	stdoutPipe, _ := cmd.StdoutPipe()
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = io.MultiWriter(&stderrBuf)
 
-	var stdErrBytes bytes.Buffer
-	cmd.Stderr = &stdErrBytes
-
-	err := cmd.Run()
-
-	if err != nil {
-		logger.Process("Command failed: %s", cmd.String())
-		if len(stdErrBytes.String()) > 0 {
-			logger.Process("Command stderr:")
-			logger.Subprocess(stdErrBytes.String())
-		}
-		logger.Process("Error status code: %s", err.Error())
+	if err := cmd.Start(); err != nil {
+		logger.Process("Failed to start command: %s", cmd.String())
 		logger.Break()
 		return err
 	}
 
-	logger.Process("Command succeeded: %s", cmd.String())
-	if len(stdOutBytes.String()) > 0 {
-		logger.Process("Command output:")
-		logger.Subprocess(stdOutBytes.String())
+	stdoutReader := bufio.NewReader(stdoutPipe)
+	stdoutLine, err := stdoutReader.ReadString('\n')
+	for err == nil {
+		logger.Subprocess(stdoutLine)
+		stdoutLine, err = stdoutReader.ReadString('\n')
+	}
+	err = cmd.Wait()
+
+	if err != nil {
+		logger.Process("Command failed: %s", cmd.String())
+		logger.Process("Error status code: %s", err.Error())
+		if len(stderrBuf.String()) > 0 {
+			logger.Process("Command output on stderr:")
+			logger.Subprocess(stderrBuf.String())
+		}
+		return err
 	}
 
 	logger.Break()
+
 	return nil
 }
 
