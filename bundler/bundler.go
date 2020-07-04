@@ -43,7 +43,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 
 	rubyGemsVersion := ""
 	if bundlerMajorVersion == 1 {
-		rubyGemsVersion = "2.7.10"
+		rubyGemsVersion = "3.0.8"
 	}
 
 	installRubyGemsUpdateSystemCmd := strings.Join([]string{
