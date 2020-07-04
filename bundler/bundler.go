@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/avarteqgmbh/rvm-cnb/rvm"
@@ -34,6 +35,53 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	bundlerLayer.Cache = true
 	bundlerLayer.Launch = true
 
+	bundlerMajorVersion, err := strconv.Atoi(bundlerVersion(context, configuration)[:1])
+	if err != nil {
+		logger.Process("Failed to determine bundler major version")
+		return packit.BuildResult{}, err
+	}
+
+	rubyGemsVersion := ""
+	if bundlerMajorVersion == 1 {
+		rubyGemsVersion = "2.7.10"
+	}
+
+	installRubyGemsUpdateSystemCmd := strings.Join([]string{
+		"gem",
+		"install",
+		"-N",
+		"rubygems-update",
+	}, " ")
+	if len(rubyGemsVersion) > 0 {
+		installRubyGemsUpdateSystemCmd = strings.Join([]string{
+			installRubyGemsUpdateSystemCmd,
+			"-v",
+			rubyGemsVersion,
+		}, " ")
+	}
+	err = RunBashCmd(installRubyGemsUpdateSystemCmd, context)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
+	gemUpdateSystemCmd := strings.Join([]string{
+		"gem",
+		"update",
+		"-N",
+		"--system",
+		rubyGemsVersion,
+	}, " ")
+	err = RunBashCmd(gemUpdateSystemCmd, context)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
+	gemCleanupCmd := strings.Join([]string{"gem", "cleanup"}, " ")
+	err = RunBashCmd(gemCleanupCmd, context)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
 	err = InstallPuma(context, configuration, logger)
 	if err != nil {
 		return packit.BuildResult{}, err
@@ -58,7 +106,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	err = configureBundlerPath(context, bundlerLayer)
+	err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion)
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
@@ -72,13 +120,15 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	bundleCleanCmd := strings.Join([]string{
-		"bundle",
-		"clean",
-	}, " ")
-	err = RunBashCmd(bundleCleanCmd, context)
-	if err != nil {
-		return packit.BuildResult{}, err
+	if bundlerMajorVersion > 1 {
+		bundleCleanCmd := strings.Join([]string{
+			"bundle",
+			"clean",
+		}, " ")
+		err = RunBashCmd(bundleCleanCmd, context)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
 	}
 
 	buildResult := packit.BuildResult{
@@ -162,11 +212,15 @@ func bundlerVersion(context packit.BuildContext, configuration Configuration) st
 	return bundlerVersion
 }
 
-func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer) error {
+func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer, bundlerMajorVersion int) error {
+	setComponent := ""
+	if bundlerMajorVersion > 1 {
+		setComponent = "set"
+	}
 	bundleConfigCmd := strings.Join([]string{
 		"bundle",
 		"config",
-		"set",
+		setComponent,
 		"--local",
 		"path",
 		bundlerLayer.Path,
