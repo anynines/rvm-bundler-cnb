@@ -120,15 +120,13 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	if bundlerMajorVersion > 1 {
-		bundleCleanCmd := strings.Join([]string{
-			"bundle",
-			"clean",
-		}, " ")
-		err = RunBashCmd(bundleCleanCmd, context)
-		if err != nil {
-			return packit.BuildResult{}, err
-		}
+	bundleCleanCmd := strings.Join([]string{
+		"bundle",
+		"clean",
+	}, " ")
+	err = RunBashCmd(bundleCleanCmd, context)
+	if err != nil {
+		return packit.BuildResult{}, err
 	}
 
 	buildResult := packit.BuildResult{
@@ -213,19 +211,12 @@ func bundlerVersion(context packit.BuildContext, configuration Configuration) st
 }
 
 func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer, bundlerMajorVersion int) error {
-	setComponent := ""
+	cmdComponents := []string{"bundle", "config"}
 	if bundlerMajorVersion > 1 {
-		setComponent = "set"
+		cmdComponents = append(cmdComponents, "set")
 	}
-	bundleConfigCmd := strings.Join([]string{
-		"bundle",
-		"config",
-		setComponent,
-		"--local",
-		"path",
-		bundlerLayer.Path,
-	}, " ")
-	err := RunBashCmd(bundleConfigCmd, context)
+	cmdComponents = append(cmdComponents, "--local", "path", bundlerLayer.Path)
+	err := RunBashCmd(strings.Join(cmdComponents, " "), context)
 	if err != nil {
 		return err
 	}
