@@ -6,7 +6,8 @@ api = "0.2"
   version = "0.0.12"
 
 [metadata]
-  include_files = ["bin/build","bin/detect","buildpack.toml"]
+  include-files = ["bin/build","bin/detect","buildpack.toml"]
+  pre-package = "./scripts/build.sh"
 
   [metadata.configuration]
     default_bundler_version = "2.1.4"
