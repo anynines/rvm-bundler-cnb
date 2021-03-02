@@ -15,7 +15,7 @@ import (
 // InstallPuma install the Puma gem and creates a workingDir/config/puma.rb if
 // the file doesn't exist already
 func InstallPuma(context packit.BuildContext, configuration Configuration, logger rvm.LogEmitter) error {
-	if configuration.InstallPuma == false {
+	if !configuration.InstallPuma {
 		return nil
 	}
 
@@ -30,14 +30,19 @@ func InstallPuma(context packit.BuildContext, configuration Configuration, logge
 		}
 		defer configPumaRb.Close()
 
-		configPumaRb.WriteString(fmt.Sprintf("bind '%s'\n", configuration.Puma.Bind))
-		configPumaRb.WriteString(fmt.Sprintf("workers %d\n", configuration.Puma.Workers))
-		configPumaRb.WriteString(fmt.Sprintf("threads %d, %d\n", configuration.Puma.Threads, configuration.Puma.Threads))
-		configPumaRb.WriteString("log_requests true\n")
+		pumacfg := ""
+		pumacfg += fmt.Sprintf("bind '%s'\n", configuration.Puma.Bind)
+		pumacfg += fmt.Sprintf("workers %s\n", configuration.Puma.Workers)
+		pumacfg += fmt.Sprintf("threads %s, %s\n", configuration.Puma.Threads, configuration.Puma.Threads)
+		pumacfg += "log_requests true\n"
 		if configuration.Puma.Preload {
-			configPumaRb.WriteString("preload_app!\n")
+			pumacfg += "preload_app!\n"
 		}
-		configPumaRb.WriteString("activate_control_app 'unix:///tmp/pumactl.sock', { no_token: true }\n")
+		pumacfg += "activate_control_app 'unix:///tmp/pumactl.sock', { no_token: true }\n"
+		_, err = configPumaRb.WriteString(pumacfg)
+		if err != nil {
+			return err
+		}
 	}
 
 	logger.Process("Using config/puma.rb supplied by application")
@@ -83,8 +88,9 @@ func CreatePumaProcess(context packit.BuildContext, configuration Configuration,
 		defer procfile.Close()
 
 		scanner := bufio.NewScanner(procfile)
+		r, _ := regexp.Compile("^web:.*$")
 		for scanner.Scan() {
-			matched, err := regexp.MatchString(`^web:.*$`, strings.TrimSpace(scanner.Text()))
+			matched := r.MatchString(strings.TrimSpace(scanner.Text()))
 			if err == nil && matched {
 				installPumaCommand = false
 				logger.Process("Do not return a process because a Procfile with process type 'web' already exists")

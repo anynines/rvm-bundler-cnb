@@ -11,8 +11,8 @@ import (
 type Puma struct {
 	Version string `toml:"version"`
 	Bind    string `toml:"bind"`
-	Workers int    `toml:"workers"`
-	Threads int    `toml:"threads"`
+	Workers string `toml:"workers"`
+	Threads string `toml:"threads"`
 	Preload bool   `toml:"preload"`
 }
 

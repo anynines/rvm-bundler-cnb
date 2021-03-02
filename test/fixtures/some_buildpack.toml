@@ -12,6 +12,6 @@ api = "0.2"
     [metadata.configuration.puma]
       version = "4.3.5"
       bind = "tcp://0.0.0.0:8080"
-      workers = 5
-      threads = 5
+      workers = "5"
+      threads = "5"
       preload = true
