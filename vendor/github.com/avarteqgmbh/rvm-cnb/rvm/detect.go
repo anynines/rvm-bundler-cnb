@@ -14,13 +14,8 @@ type VersionParser interface {
 
 // BuildPlanMetadata represents this buildpack's metadata
 type BuildPlanMetadata struct {
-	RubyVersion string `toml:"ruby_version"`
-}
-
-// NodebuildPlanMetadata represents the metadata for the node dependency
-type NodebuildPlanMetadata struct {
-	Build  bool `toml:"build"`
-	Launch bool `toml:"launch"`
+	RubyVersion   string `toml:"ruby_version"`
+	VersionSource string `toml:"version_source"`
 }
 
 // VersionParserEnv represents an environment that contains everything that is
@@ -64,8 +59,8 @@ func Detect(logger LogEmitter, rubyVersionParser VersionParser, gemFileParser Ve
 		// ruby version string "wins"
 		versionEnvs := []VersionParserEnv{
 			{
-				Parser:  rubyVersionParser,
-				Path:    ".ruby-version",
+				Parser:  gemFileLockParser,
+				Path:    "Gemfile.lock",
 				Context: context,
 				Logger:  logger,
 			},
@@ -76,8 +71,8 @@ func Detect(logger LogEmitter, rubyVersionParser VersionParser, gemFileParser Ve
 				Logger:  logger,
 			},
 			{
-				Parser:  gemFileLockParser,
-				Path:    "Gemfile.lock",
+				Parser:  rubyVersionParser,
+				Path:    ".ruby-version",
 				Context: context,
 				Logger:  logger,
 			},
@@ -102,7 +97,8 @@ func Detect(logger LogEmitter, rubyVersionParser VersionParser, gemFileParser Ve
 			{
 				Name: "rvm",
 				Metadata: BuildPlanMetadata{
-					RubyVersion: rubyVersion,
+					RubyVersion:   rubyVersion,
+					VersionSource: "rvm-cnb",
 				},
 			},
 		}
@@ -122,11 +118,10 @@ func Detect(logger LogEmitter, rubyVersionParser VersionParser, gemFileParser Ve
 			}
 			logger.Detail("The buildpack requested node version: %s", nodeVersion)
 			requirements = append(requirements, packit.BuildPlanRequirement{
-				Name:    "node",
-				Version: nodeVersion,
-				Metadata: NodebuildPlanMetadata{
-					Build:  true,
-					Launch: true,
+				Name: "node",
+				Metadata: BuildPlanMetadata{
+					RubyVersion:   nodeVersion,
+					VersionSource: "rvm-cnb",
 				},
 			})
 		}

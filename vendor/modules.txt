@@ -1,24 +1,35 @@
 # github.com/BurntSushi/toml v0.3.1
 ## explicit
 github.com/BurntSushi/toml
+# github.com/ForestEckhardt/freezer v0.0.6
+github.com/ForestEckhardt/freezer
+github.com/ForestEckhardt/freezer/github
+# github.com/Masterminds/semver/v3 v3.1.1
+github.com/Masterminds/semver/v3
 # github.com/VividCortex/ewma v1.1.1
 github.com/VividCortex/ewma
-# github.com/avarteqgmbh/rvm-cnb v0.1.7
+# github.com/avarteqgmbh/rvm-cnb v0.1.15-0.20210303094507-dc09d9e26d3d
 ## explicit
 github.com/avarteqgmbh/rvm-cnb/rvm
 github.com/avarteqgmbh/rvm-cnb/rvm/fakes
-# github.com/cheggaaa/pb/v3 v3.0.4
+# github.com/cheggaaa/pb/v3 v3.0.5
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
 # github.com/fatih/color v1.9.0
 github.com/fatih/color
-# github.com/mattn/go-colorable v0.1.4
+# github.com/gabriel-vasile/mimetype v1.1.2
+github.com/gabriel-vasile/mimetype
+github.com/gabriel-vasile/mimetype/internal/json
+github.com/gabriel-vasile/mimetype/internal/matchers
+# github.com/mattn/go-colorable v0.1.8
 github.com/mattn/go-colorable
 # github.com/mattn/go-isatty v0.0.12
 github.com/mattn/go-isatty
-# github.com/mattn/go-runewidth v0.0.8
+# github.com/mattn/go-runewidth v0.0.9
 github.com/mattn/go-runewidth
-# github.com/onsi/gomega v1.10.1
+# github.com/oklog/ulid v1.3.1
+github.com/oklog/ulid
+# github.com/onsi/gomega v1.10.5
 ## explicit
 github.com/onsi/gomega
 github.com/onsi/gomega/format
@@ -32,22 +43,37 @@ github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/paketo-buildpacks/packit v0.0.16
+# github.com/paketo-buildpacks/occam v0.1.2
+## explicit
+github.com/paketo-buildpacks/occam
+github.com/paketo-buildpacks/occam/matchers
+# github.com/paketo-buildpacks/packit v0.7.0
 ## explicit
 github.com/paketo-buildpacks/packit
+github.com/paketo-buildpacks/packit/cargo
+github.com/paketo-buildpacks/packit/fs
 github.com/paketo-buildpacks/packit/internal
+github.com/paketo-buildpacks/packit/pexec
+github.com/paketo-buildpacks/packit/postal
 github.com/paketo-buildpacks/packit/scribe
+github.com/paketo-buildpacks/packit/vacation
 # github.com/sclevine/spec v1.4.0
 ## explicit
 github.com/sclevine/spec
 github.com/sclevine/spec/report
-# golang.org/x/net v0.0.0-20200520004742-59133d7f0dd7
+# github.com/ulikunitz/xz v0.5.10
+github.com/ulikunitz/xz
+github.com/ulikunitz/xz/internal/hash
+github.com/ulikunitz/xz/internal/xlog
+github.com/ulikunitz/xz/lzma
+# golang.org/x/net v0.0.0-20201202161906-c7110b5ffcbb
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd
+# golang.org/x/sys v0.0.0-20201018230417-eeed37f84f13
+golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
-# golang.org/x/text v0.3.2
+# golang.org/x/text v0.3.4
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -65,9 +91,6 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
-# golang.org/x/xerrors v0.0.0-20191204190536-9bdfabe68543
-golang.org/x/xerrors
-golang.org/x/xerrors/internal
-# gopkg.in/yaml.v2 v2.3.0
+# gopkg.in/yaml.v2 v2.4.0
 ## explicit
 gopkg.in/yaml.v2

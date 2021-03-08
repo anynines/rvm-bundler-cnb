@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -29,7 +30,7 @@ type BuildContext struct {
 
 	// Plan includes the BuildpackPlan provided by the lifecycle as specified in
 	// the specification:
-	// https://github.com/buildpacks/spec/blob/master/buildpack.md#buildpack-plan-toml.
+	// https://github.com/buildpacks/spec/blob/main/buildpack.md#buildpack-plan-toml.
 	Plan BuildpackPlan
 
 	// Stack is the value of the chosen stack. This value is populated from the
@@ -60,17 +61,35 @@ type BuildResult struct {
 	// available to the lifecycle.
 	Layers []Layer
 
+	// Launch is the metadata that will be persisted as launch.toml according to
+	// the buildpack lifecycle specification:
+	// https://github.com/buildpacks/spec/blob/main/buildpack.md#launchtoml-toml
+	Launch LaunchMetadata
+}
+
+// LaunchMetadata represents the launch metadata details persisted in the
+// launch.toml file according to the buildpack lifecycle specification:
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#launchtoml-toml.
+type LaunchMetadata struct {
 	// Processes is a list of processes that will be returned to the lifecycle to
 	// be executed during the launch phase.
 	Processes []Process
+
+	// Slices is a list of slices that will be returned to the lifecycle to be
+	// exported as separate layers during the export phase.
+	Slices []Slice
+
+	// Labels is a map of key-value pairs that will be returned to the lifecycle to be
+	// added as config label on the image metadata. Keys must be unique.
+	Labels map[string]string
 }
 
 // Process represents a process to be run during the launch phase as described
 // in the specification:
-// https://github.com/buildpacks/spec/blob/master/buildpack.md#launch. The
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#launch. The
 // fields of the process are describe in the specification of the launch.toml
 // file:
-// https://github.com/buildpacks/spec/blob/master/buildpack.md#launchtoml-toml.
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#launchtoml-toml.
 type Process struct {
 	// Type is an identifier to describe the type of process to be executed, eg.
 	// "web".
@@ -86,9 +105,20 @@ type Process struct {
 	Direct bool `toml:"direct"`
 }
 
+// Slice represents a layer of the working directory to be exported during the
+// export phase. These slices help to optimize data transfer for files that are
+// commonly shared across applications.  Slices are described in the layers
+// section of the buildpack spec:
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#layers.  The slice
+// fields are described in the specification of the launch.toml file:
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#launchtoml-toml.
+type Slice struct {
+	Paths []string `toml:"paths"`
+}
+
 // BuildpackInfo is a representation of the basic information for a buildpack
 // provided in its buildpack.toml file as described in the specification:
-// https://github.com/buildpacks/spec/blob/master/buildpack.md#buildpacktoml-toml.
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#buildpacktoml-toml.
 type BuildpackInfo struct {
 	// ID is the identifier specified in the `buildpack.id` field of the buildpack.toml.
 	ID string `toml:"id"`
@@ -102,7 +132,7 @@ type BuildpackInfo struct {
 
 // BuildpackPlan is a representation of the buildpack plan provided by the
 // lifecycle and defined in the specification:
-// https://github.com/buildpacks/spec/blob/master/buildpack.md#buildpack-plan-toml.
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#buildpack-plan-toml.
 // It is also used to return a set of refinements to the plan at the end of the
 // build phase.
 type BuildpackPlan struct {
@@ -117,13 +147,9 @@ type BuildpackPlanEntry struct {
 	// Name is the name of the dependency the the buildpack should provide.
 	Name string `toml:"name"`
 
-	// Version if the version contraint that defines what would be an acceptable
-	// dependency provided by the buildpack.
-	Version string `toml:"version"`
-
 	// Metadata is an unspecified field allowing buildpacks to communicate extra
 	// details about their requirement. Examples of this type of metadata might
-	// include details about what source was used to decide the Version
+	// include details about what source was used to decide the version
 	// constraint for a requirement.
 	Metadata map[string]interface{} `toml:"metadata"`
 }
@@ -161,7 +187,10 @@ func Build(f BuildFunc, options ...Option) {
 		return
 	}
 
-	cnbPath := filepath.Clean(strings.TrimSuffix(config.args[0], filepath.Join("bin", "build")))
+	cnbPath, ok := os.LookupEnv("CNB_BUILDPACK_DIR")
+	if !ok {
+		cnbPath = filepath.Clean(strings.TrimSuffix(config.args[0], filepath.Join("bin", "build")))
+	}
 
 	var buildpackInfo struct {
 		Buildpack BuildpackInfo `toml:"buildpack"`
@@ -235,11 +264,34 @@ func Build(f BuildFunc, options ...Option) {
 		}
 	}
 
-	if len(result.Processes) > 0 {
+	if len(result.Launch.Processes) > 0 ||
+		len(result.Launch.Slices) > 0 ||
+		len(result.Launch.Labels) > 0 {
+
+		type label struct {
+			Key   string `toml:"key"`
+			Value string `toml:"value"`
+		}
+
 		var launch struct {
 			Processes []Process `toml:"processes"`
+			Slices    []Slice   `toml:"slices"`
+			Labels    []label   `toml:"labels"`
 		}
-		launch.Processes = result.Processes
+
+		launch.Processes = result.Launch.Processes
+		launch.Slices = result.Launch.Slices
+
+		if len(result.Launch.Labels) > 0 {
+			launch.Labels = []label{}
+			for k, v := range result.Launch.Labels {
+				launch.Labels = append(launch.Labels, label{Key: k, Value: v})
+			}
+
+			sort.Slice(launch.Labels, func(i, j int) bool {
+				return launch.Labels[i].Key < launch.Labels[j].Key
+			})
+		}
 
 		err = config.tomlWriter.Write(filepath.Join(layersPath, "launch.toml"), launch)
 		if err != nil {

@@ -79,8 +79,11 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 				},
 				Requires: []packit.BuildPlanRequirement{
 					{
-						Name:    "rvm-bundler",
-						Version: "2.1.4",
+						Name: "rvm-bundler",
+						Metadata: bundler.BuildPlanMetadata{
+							RvmBundlerVersion: "2.1.4",
+							VersionSource:     "rvm-bundler",
+						},
 					},
 				},
 			}))
@@ -108,8 +111,11 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 				},
 				Requires: []packit.BuildPlanRequirement{
 					{
-						Name:    "rvm-bundler",
-						Version: "2.1.4",
+						Name: "rvm-bundler",
+						Metadata: bundler.BuildPlanMetadata{
+							RvmBundlerVersion: "2.1.4",
+							VersionSource:     "rvm-bundler",
+						},
 					},
 				},
 			}))
