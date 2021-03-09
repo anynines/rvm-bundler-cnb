@@ -15,6 +15,9 @@ source "${PROGDIR}/.util/print.sh"
 # shellcheck source=SCRIPTDIR/.util/git.sh
 source "${PROGDIR}/.util/git.sh"
 
+# shellcheck source=SCRIPTDIR/.util/builder.sh
+source "${PROGDIR}/.util/builder.sh"
+
 function main() {
   while [[ "${#}" != 0 ]]; do
     case "${1}" in
@@ -44,6 +47,8 @@ function main() {
   fi
 
   tools::install
+  util::builder::stack::build
+  util::builder::builder::build
   images::pull
   tests::run
 }
@@ -85,24 +90,18 @@ function images::pull() {
     builder="index.docker.io/paketobuildpacks/builder:base"
   fi
 
-  util::print::title "Pulling builder image..."
-  docker pull "${builder}"
-
   util::print::title "Setting default pack builder image..."
-  pack set-default-builder "${builder}"
+  pack config default-builder "${builder}"
 
   local run_image lifecycle_image
   run_image="$(
     pack inspect-builder "${builder}" --output json \
-      | jq -r '.remote_info.run_images[0].name'
+      | jq -r '.local_info.run_images[0].name'
   )"
   lifecycle_image="index.docker.io/buildpacksio/lifecycle:$(
     pack inspect-builder "${builder}" --output json \
-      | jq -r '.remote_info.lifecycle.version'
+      | jq -r '.local_info.lifecycle.version'
   )"
-
-  util::print::title "Pulling run image..."
-  docker pull "${run_image}"
 
   util::print::title "Pulling lifecycle image..."
   docker pull "${lifecycle_image}"

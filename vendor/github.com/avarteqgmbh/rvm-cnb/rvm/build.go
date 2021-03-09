@@ -1,6 +1,8 @@
 package rvm
 
 import (
+	"path/filepath"
+
 	"github.com/paketo-buildpacks/packit"
 )
 
@@ -18,7 +20,15 @@ func Build(environment EnvironmentConfiguration, logger LogEmitter) packit.Build
 			return packit.BuildResult{}, err
 		}
 
+		buildPackYMLPath := filepath.Join(context.WorkingDir, "buildpack.yml")
+		buildPackYML, err := BuildpackYMLParse(buildPackYMLPath)
+		if err != nil {
+			logger.Detail("Parsing '%s' failed", buildPackYMLPath)
+			return packit.BuildResult{}, err
+		}
+
 		rvmEnv := Env{
+			BuildPackYML:  buildPackYML,
 			Configuration: configuration,
 			Context:       context,
 			Environment:   environment,

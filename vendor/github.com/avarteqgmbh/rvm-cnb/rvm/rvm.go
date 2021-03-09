@@ -1,8 +1,10 @@
 package rvm
 
 import (
+	"bufio"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,6 +15,7 @@ import (
 
 // Env represents an RVM environment
 type Env struct {
+	BuildPackYML  BuildPackYML
 	Context       packit.BuildContext
 	Logger        LogEmitter
 	Configuration Configuration
@@ -24,7 +27,7 @@ func (r Env) BuildRvm() (packit.BuildResult, error) {
 	r.Logger.Title("%s %s", r.Context.BuildpackInfo.Name, r.Context.BuildpackInfo.Version)
 
 	r.Logger.Process("Using RVM URI: %s\n", r.Configuration.URI)
-	r.Logger.Process("default RVM version: %s\n", r.Configuration.DefaultRVMVersion)
+	r.Logger.Process("RVM version: %s\n", r.rvmVersion())
 	r.Logger.Process("build plan Ruby version: %s\n", r.rubyVersion())
 
 	buildResult, err := r.installRVM()
@@ -43,26 +46,37 @@ func (r Env) RunBashCmd(command string, rvmLayer *packit.Layer) error {
 	)
 
 	r.Logger.Process("Executing: %s", strings.Join(cmd.Args, " "))
-	r.Logger.Subprocess("Environment variables:\n%s", strings.Join(cmd.Env, "\n"))
-	r.Logger.Break()
 
-	var stdOutBytes bytes.Buffer
-	cmd.Stdout = &stdOutBytes
+	stdoutPipe, _ := cmd.StdoutPipe()
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = io.MultiWriter(&stderrBuf)
 
-	var stdErrBytes bytes.Buffer
-	cmd.Stderr = &stdErrBytes
-
-	err := cmd.Run()
-
-	if err != nil {
-		r.Logger.Subprocess("Command failed: %s", cmd.String())
-		r.Logger.Subprocess("Command stderr: %s", stdErrBytes.String())
-		r.Logger.Subprocess("Error status code: %s", err.Error())
+	if err := cmd.Start(); err != nil {
+		r.Logger.Process("Failed to start command: %s", cmd.String())
+		r.Logger.Break()
 		return err
 	}
 
-	r.Logger.Subprocess("Command succeeded: %s", cmd.String())
-	r.Logger.Subprocess("Command output: %s", stdOutBytes.String())
+	stdoutReader := bufio.NewReader(stdoutPipe)
+	stdoutLine, err := stdoutReader.ReadString('\n')
+	for err == nil {
+		r.Logger.Subprocess(stdoutLine)
+		stdoutLine, err = stdoutReader.ReadString('\n')
+	}
+	err = cmd.Wait()
+
+	if err != nil {
+		r.Logger.Process("Command failed: %s", cmd.String())
+		r.Logger.Process("Error status code: %s", err.Error())
+		if len(stderrBuf.String()) > 0 {
+			r.Logger.Process("Command output on stderr:")
+			r.Logger.Subprocess(stderrBuf.String())
+		}
+		r.Logger.Break()
+		return err
+	}
+
+	r.Logger.Break()
 
 	return nil
 }
@@ -83,21 +97,37 @@ func (r Env) RunRvmCmd(command string, rvmLayer *packit.Layer) error {
 func (r Env) rubyVersion() string {
 	rubyVersion := r.Configuration.DefaultRubyVersion
 	for _, entry := range r.Context.Plan.Entries {
-		if entry.Name == "rvm" {
+		if entry.Name == "rvm" && entry.Metadata["ruby_version"] != nil {
 			rubyVersion = fmt.Sprintf("%v", entry.Metadata["ruby_version"])
 		}
 	}
 	return rubyVersion
 }
 
+func (r Env) rvmVersion() string {
+	rvmVersion := r.Configuration.DefaultRVMVersion
+	for _, entry := range r.Context.Plan.Entries {
+		if entry.Name == "rvm" && entry.Metadata["rvm_version"] != nil {
+			rvmVersion = fmt.Sprintf("%v", entry.Metadata["rvm_version"])
+		}
+	}
+	cmp := r.BuildPackYML != BuildPackYML{}
+	if cmp && len(r.BuildPackYML.RvmVersion) > 0 {
+		rvmVersion = r.BuildPackYML.RvmVersion
+	}
+	return rvmVersion
+}
+
 func (r Env) installRVM() (packit.BuildResult, error) {
-	rvmLayer, err := r.Context.Layers.Get("rvm", packit.LaunchLayer)
+	rvmLayer, err := r.Context.Layers.Get("rvm")
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
 
 	if rvmLayer.Metadata["rvm_version"] != nil &&
-		rvmLayer.Metadata["rvm_version"].(string) == r.Configuration.DefaultRVMVersion {
+		rvmLayer.Metadata["rvm_version"].(string) == r.rvmVersion() &&
+		rvmLayer.Metadata["ruby_version"] != nil &&
+		rvmLayer.Metadata["ruby_version"].(string) == r.rubyVersion() {
 		r.Logger.Process("Reusing cached layer %s", rvmLayer.Path)
 		return packit.BuildResult{
 			Plan: r.Context.Plan,
@@ -107,15 +137,15 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 		}, nil
 	}
 
-	r.Logger.Process("Installing RVM version '%s' from URI '%s'", r.Configuration.DefaultRVMVersion, r.Configuration.URI)
+	r.Logger.Process("Installing RVM version '%s' from URI '%s'", r.rvmVersion(), r.Configuration.URI)
 
-	if err = rvmLayer.Reset(); err != nil {
+	if rvmLayer, err = rvmLayer.Reset(); err != nil {
 		r.Logger.Process("Resetting RVM layer failed")
 		return packit.BuildResult{}, err
 	}
 
 	rvmLayer.Metadata = map[string]interface{}{
-		"rvm_version":  r.Configuration.DefaultRVMVersion,
+		"rvm_version":  r.rvmVersion(),
 		"ruby_version": r.rubyVersion(),
 	}
 
@@ -128,12 +158,51 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 		return packit.BuildResult{}, err
 	}
 
+	// The following commands import GPP keys:
+	// curl -sSL https://rvm.io/mpapis.asc | gpg --import -
+	// curl -sSL https://rvm.io/pkuczynski.asc | gpg --import -
+	// this is necessary because installing RVM on a Ubuntu 16.04 container which
+	// does not have these keys imported yet fails otherwise
+	// see: https://rvm.io/rvm/security
+	// commented for now and kept for future usage
+	gpgBinaryInstalledOutput, _ := exec.Command("which", "gpg").Output()
+
+	if len(gpgBinaryInstalledOutput) > 0 {
+		importGPGKey1Cmd := strings.Join([]string{
+			"curl",
+			"-sSL",
+			"https://rvm.io/mpapis.asc",
+			"|",
+			"gpg",
+			"--import",
+			"-",
+		}, " ")
+		err = r.RunBashCmd(importGPGKey1Cmd, &rvmLayer)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
+		importGPGKey2Cmd := strings.Join([]string{
+			"curl",
+			"-sSL",
+			"https://rvm.io/pkuczynski.asc",
+			"|",
+			"gpg",
+			"--import",
+			"-",
+		}, " ")
+		err = r.RunBashCmd(importGPGKey2Cmd, &rvmLayer)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+	}
+
 	shellCmd := strings.Join([]string{
 		"curl",
 		"-vsSL",
 		r.Configuration.URI,
 		"| bash -s -- --version",
-		r.Configuration.DefaultRVMVersion,
+		r.rvmVersion(),
 	}, " ")
 	err = r.RunBashCmd(shellCmd, &rvmLayer)
 	if err != nil {
@@ -160,25 +229,14 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 		return packit.BuildResult{}, err
 	}
 
-	gemUpdateSystemCmd := strings.Join([]string{
-		"gem",
-		"update",
-		"-N",
-		"--system",
-	}, " ")
-	err = r.RunRvmCmd(gemUpdateSystemCmd, &rvmLayer)
-	if err != nil {
-		return packit.BuildResult{}, err
-	}
-
-	gemCleanupCmd := strings.Join([]string{"gem", "cleanup"}, " ")
-	err = r.RunRvmCmd(gemCleanupCmd, &rvmLayer)
-	if err != nil {
-		return packit.BuildResult{}, err
-	}
-
 	rvmCleanupCmd := strings.Join([]string{"rvm", "cleanup", "all"}, " ")
 	err = r.RunRvmCmd(rvmCleanupCmd, &rvmLayer)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
+	rvmSetDefaultRubyCmd := strings.Join([]string{"rvm", "alias", "create", "default", r.rubyVersion()}, " ")
+	err = r.RunRvmCmd(rvmSetDefaultRubyCmd, &rvmLayer)
 	if err != nil {
 		return packit.BuildResult{}, err
 	}

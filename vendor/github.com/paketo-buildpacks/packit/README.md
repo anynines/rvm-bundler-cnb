@@ -4,7 +4,7 @@
 
 Package packit provides primitives for implementing a Cloud Native Buildpack
 according to the specification:
-[https://github.com/buildpacks/spec/blob/master/buildpack.md](https://github.com/buildpacks/spec/blob/master/buildpack.md).
+[https://github.com/buildpacks/spec/blob/main/buildpack.md](https://github.com/buildpacks/spec/blob/main/buildpack.md).
 
 ## Buildpack Interface
 
@@ -121,10 +121,13 @@ func main() {
 		// The BuildContext also provides a mechanism whereby a layer can be
 		// created to store the results of a given portion of the build process.
 		// This example creates a layer called "yarn" that will hold the yarn cli.
-		layer, err := context.Layers.Get("yarn", packit.BuildLayer, packit.LaunchLayer)
+		layer, err := context.Layers.Get("yarn")
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
+
+		layer.Build = true
+		layer.Launch = true
 
 		// At this point we are performing the process of installing the yarn cli.
 		// As those details are not important to the explanation of the packit API,
@@ -224,7 +227,7 @@ used to create buildpack tarball artifacts. The `jam` name is simply a play on
 the idea of "packaging" or "packing" a buildpack.
 
 The `jam` executable can be installed by downloading the latest version from
-the [Releases](/releases) page. Once downloaded, buildpacks can be created from
+the [Releases](../../releases) page. Once downloaded, buildpacks can be created from
 a source repository using the `pack` command like this:
 
 ```sh

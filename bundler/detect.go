@@ -8,6 +8,12 @@ import (
 	"github.com/paketo-buildpacks/packit"
 )
 
+// BuildPlanMetadata represents this buildpack's metadata
+type BuildPlanMetadata struct {
+	RvmBundlerVersion string `toml:"rvm_bundler_version"`
+	VersionSource     string `toml:"version_source"`
+}
+
 // VersionParser represents a parser for files like .ruby-version and Gemfiles
 type VersionParser interface {
 	ParseVersion(path string) (version string, err error)
@@ -61,8 +67,11 @@ func Detect(logger rvm.LogEmitter, bundlerVersionParser VersionParser, buildpack
 				},
 				Requires: []packit.BuildPlanRequirement{
 					{
-						Name:    "rvm-bundler",
-						Version: bundlerVersion,
+						Name: "rvm-bundler",
+						Metadata: BuildPlanMetadata{
+							RvmBundlerVersion: bundlerVersion,
+							VersionSource:     "rvm-bundler",
+						},
 					},
 				},
 			},

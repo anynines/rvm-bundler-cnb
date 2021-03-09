@@ -3,7 +3,6 @@ package bundler
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -20,7 +19,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 	logger.Process("default Bundler version: %s\n", bundlerVersion(context, configuration))
 
-	bundlerLayer, err := context.Layers.Get("rvm-bundler", packit.LaunchLayer)
+	bundlerLayer, err := context.Layers.Get("rvm-bundler")
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
@@ -138,7 +137,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 
 	pumaProcess, err := CreatePumaProcess(context, configuration, logger)
 	if err == nil && pumaProcess.Type == "web" && pumaProcess.Command != "" {
-		buildResult.Processes = append(buildResult.Processes, pumaProcess)
+		buildResult.Launch.Processes = append(buildResult.Launch.Processes, pumaProcess)
 	}
 	return buildResult, nil
 }
@@ -204,7 +203,9 @@ func bundlerVersion(context packit.BuildContext, configuration Configuration) st
 	bundlerVersion := configuration.DefaultBundlerVersion
 	for _, entry := range context.Plan.Entries {
 		if entry.Name == "rvm-bundler" {
-			bundlerVersion = fmt.Sprintf("%v", entry.Version)
+			if version, ok := entry.Metadata["rvm_bundler_version"].(string); ok {
+				bundlerVersion = version
+			}
 		}
 	}
 	return bundlerVersion

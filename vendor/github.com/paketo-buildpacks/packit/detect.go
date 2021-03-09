@@ -25,6 +25,10 @@ type DetectContext struct {
 	// BuildpackInfo includes the details of the buildpack parsed from the
 	// buildpack.toml included in the buildpack contents.
 	BuildpackInfo BuildpackInfo
+
+	// Stack is the value of the chosen stack. This value is populated from the
+	// $CNB_STACK_ID environment variable.
+	Stack string
 }
 
 // DetectFunc is the definition of a callback that can be invoked when the
@@ -44,7 +48,7 @@ type DetectResult struct {
 
 // BuildPlan is a representation of the Build Plan as specified in the
 // specification:
-// https://github.com/buildpacks/spec/blob/master/buildpack.md#build-plan-toml.
+// https://github.com/buildpacks/spec/blob/main/buildpack.md#build-plan-toml.
 // The BuildPlan allows buildpacks to indicate what dependencies they provide
 // or require.
 type BuildPlan struct {
@@ -74,13 +78,9 @@ type BuildPlanRequirement struct {
 	// is provided or required.
 	Name string `toml:"name"`
 
-	// Version allows a requirement to include a constraint describing what
-	// versions of the dependency are considered acceptable.
-	Version string `toml:"version"`
-
 	// Metadata is an unspecified field allowing buildpacks to communicate extra
 	// details about their requirement. Examples of this type of metadata might
-	// include details about what source was used to decide the Version
+	// include details about what source was used to decide the version
 	// constraint for a requirement.
 	Metadata interface{} `toml:"metadata"`
 }
@@ -104,7 +104,10 @@ func Detect(f DetectFunc, options ...Option) {
 		return
 	}
 
-	cnbPath := filepath.Clean(strings.TrimSuffix(config.args[0], filepath.Join("bin", "detect")))
+	cnbPath, ok := os.LookupEnv("CNB_BUILDPACK_DIR")
+	if !ok {
+		cnbPath = filepath.Clean(strings.TrimSuffix(config.args[0], filepath.Join("bin", "detect")))
+	}
 
 	var buildpackInfo struct {
 		Buildpack BuildpackInfo `toml:"buildpack"`
@@ -119,6 +122,7 @@ func Detect(f DetectFunc, options ...Option) {
 		WorkingDir:    dir,
 		CNBPath:       cnbPath,
 		BuildpackInfo: buildpackInfo.Buildpack,
+		Stack:         os.Getenv("CNB_STACK_ID"),
 	})
 	if err != nil {
 		config.exitHandler.Error(err)

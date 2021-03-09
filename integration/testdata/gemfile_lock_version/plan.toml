@@ -1,0 +1,11 @@
+[[requires]]
+  name = "rvm-bundler"
+
+  [requires.metadata]
+    launch = true
+
+[[requires]]
+  name = "rvm"
+
+  [requires.metadata]
+    launch = true
