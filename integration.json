@@ -1,5 +1,5 @@
 {
-  "builder": "anyninesgmbh/builder:bionic",
+  "builder": "anyninesgmbh/rails-builder:latest",
   "build-plan": "github.com/paketo-community/build-plan",
   "rvm": "github.com/avarteqgmbh/rvm-cnb"
 }

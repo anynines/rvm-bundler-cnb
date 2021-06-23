@@ -10,6 +10,7 @@ import (
 	"github.com/sclevine/spec"
 
 	. "github.com/onsi/gomega"
+	"github.com/onsi/gomega/format"
 	. "github.com/paketo-buildpacks/occam/matchers"
 )
 
@@ -40,6 +41,7 @@ func testGemfileLock(t *testing.T, context spec.G, it spec.S) {
 			var err error
 			name, err = occam.RandomName()
 			Expect(err).NotTo(HaveOccurred())
+			format.MaxLength = 0
 		})
 
 		it.After(func() {

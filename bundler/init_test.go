@@ -13,5 +13,6 @@ func TestUnitBundler(t *testing.T) {
 	suite("BundlerVersionParser", testBundlerVersionParser)
 	suite("BuildpackYMLParser", testBuildpackYMLParser)
 	suite("Detect", testDetect)
+	suite("Bundler", testBundler)
 	suite.Run(t)
 }

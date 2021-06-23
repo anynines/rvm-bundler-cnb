@@ -8,13 +8,13 @@ import (
 	"archive/tar"
 	"archive/zip"
 	"bufio"
-	"bytes"
+	"compress/bzip2"
 	"compress/gzip"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/gabriel-vasile/mimetype"
@@ -46,6 +46,12 @@ type TarXZArchive struct {
 	components int
 }
 
+// A TarBzip2Archive decompresses bzip2 files from an input stream.
+type TarBzip2Archive struct {
+	reader     io.Reader
+	components int
+}
+
 // NewArchive returns a new Archive that reads from inputReader.
 func NewArchive(inputReader io.Reader) Archive {
 	return Archive{reader: inputReader}
@@ -66,6 +72,11 @@ func NewTarXZArchive(inputReader io.Reader) TarXZArchive {
 	return TarXZArchive{reader: inputReader}
 }
 
+// NewTarBzip2Archive returns a new Bzip2Archive that reads from inputReader.
+func NewTarBzip2Archive(inputReader io.Reader) TarBzip2Archive {
+	return TarBzip2Archive{reader: inputReader}
+}
+
 // Decompress reads from TarArchive and writes files into the
 // destination specified.
 func (ta TarArchive) Decompress(destination string) error {
@@ -75,6 +86,16 @@ func (ta TarArchive) Decompress(destination string) error {
 	// tarball, which can be seen in the test around there being no directory
 	// metadata.
 	directories := map[string]interface{}{}
+
+	// Struct and slice to collect symlinks and create them after all files have
+	// been created
+	type header struct {
+		name     string
+		linkname string
+		path     string
+	}
+
+	var symlinkHeaders []header
 
 	tarReader := tar.NewReader(ta.reader)
 	for {
@@ -86,7 +107,17 @@ func (ta TarArchive) Decompress(destination string) error {
 			return fmt.Errorf("failed to read tar response: %s", err)
 		}
 
-		fileNames := strings.Split(hdr.Name, string(filepath.Separator))
+		// Skip if the destination it the destination directory itself i.e. ./
+		if hdr.Name == "./" {
+			continue
+		}
+
+		err = checkExtractPath(hdr.Name, destination)
+		if err != nil {
+			return err
+		}
+
+		fileNames := strings.Split(hdr.Name, "/")
 
 		// Checks to see if file should be written when stripping components
 		if len(fileNames) <= ta.components {
@@ -138,11 +169,52 @@ func (ta TarArchive) Decompress(destination string) error {
 			}
 
 		case tar.TypeSymlink:
-			err = os.Symlink(hdr.Linkname, path)
-			if err != nil {
-				return fmt.Errorf("failed to extract symlink: %s", err)
-			}
+			// Collect all of the headers for symlinks so that they can be verified
+			// after all other files are written
+			symlinkHeaders = append(symlinkHeaders, header{
+				name:     hdr.Name,
+				linkname: hdr.Linkname,
+				path:     path,
+			})
+		}
+	}
 
+	// Sort the symlinks so that symlinks of symlinks have their base link
+	// created before they are created.
+	//
+	// For example:
+	// b-sym -> a-sym/x
+	// a-sym -> z
+	// c-sym -> d-sym
+	// d-sym -> z
+	//
+	// Will sort to:
+	// a-sym -> z
+	// b-sym -> a-sym/x
+	// d-sym -> z
+	// c-sym -> d-sym
+	sort.Slice(symlinkHeaders, func(i, j int) bool {
+		if filepath.Clean(symlinkHeaders[i].name) == linknameFullPath(symlinkHeaders[j].name, symlinkHeaders[j].linkname) {
+			return true
+		}
+
+		if filepath.Clean(symlinkHeaders[j].name) == linknameFullPath(symlinkHeaders[i].name, symlinkHeaders[i].linkname) {
+			return false
+		}
+
+		return filepath.Clean(symlinkHeaders[i].name) < linknameFullPath(symlinkHeaders[j].name, symlinkHeaders[j].linkname)
+	})
+
+	for _, h := range symlinkHeaders {
+		// Check to see if the file that will be linked to is valid for symlinking
+		_, err := filepath.EvalSymlinks(linknameFullPath(h.path, h.linkname))
+		if err != nil {
+			return fmt.Errorf("failed to evaluate symlink %s: %w", h.path, err)
+		}
+
+		err = os.Symlink(h.linkname, h.path)
+		if err != nil {
+			return fmt.Errorf("failed to extract symlink: %s", err)
 		}
 	}
 
@@ -151,6 +223,10 @@ func (ta TarArchive) Decompress(destination string) error {
 
 // Decompress reads from Archive, determines the archive type of the input
 // stream, and writes files into the destination specified.
+//
+// Archive decompression will also handle files that are types "text/plain;
+// charset=utf-8" and write the contents of the input stream to a file name
+// "artifact" in the destination directory.
 func (a Archive) Decompress(destination string) error {
 	// Convert reader into a buffered read so that the header can be peeked to
 	// determine the type.
@@ -175,8 +251,14 @@ func (a Archive) Decompress(destination string) error {
 		return NewTarGzipArchive(bufferedReader).StripComponents(a.components).Decompress(destination)
 	case "application/x-xz":
 		return NewTarXZArchive(bufferedReader).StripComponents(a.components).Decompress(destination)
+	case "application/x-bzip2":
+		return NewTarBzip2Archive(bufferedReader).StripComponents(a.components).Decompress(destination)
 	case "application/zip":
 		return NewZipArchive(bufferedReader).Decompress(destination)
+	case "text/plain; charset=utf-8":
+		// This function will write the contents of the reader to file called
+		// "artifact" in the destination directory
+		return writeTextFile(bufferedReader, destination)
 	default:
 		return fmt.Errorf("unsupported archive type: %s", mime.String())
 	}
@@ -202,6 +284,26 @@ func (txz TarXZArchive) Decompress(destination string) error {
 	}
 
 	return NewTarArchive(xzr).StripComponents(txz.components).Decompress(destination)
+}
+
+// Decompress reads from TarBzip2Archive and writes files into the destination
+// specified.
+func (tbz TarBzip2Archive) Decompress(destination string) error {
+	return NewTarArchive(bzip2.NewReader(tbz.reader)).StripComponents(tbz.components).Decompress(destination)
+}
+
+func writeTextFile(reader io.Reader, destination string) error {
+	file, err := os.Create(filepath.Join(destination, "artifact"))
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = io.Copy(file, reader)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // StripComponents behaves like the --strip-components flag on tar command
@@ -234,6 +336,13 @@ func (txz TarXZArchive) StripComponents(components int) TarXZArchive {
 	return txz
 }
 
+// StripComponents behaves like the --strip-components flag on tar command
+// removing the first n levels from the final decompression destination.
+func (tbz TarBzip2Archive) StripComponents(components int) TarBzip2Archive {
+	tbz.components = components
+	return tbz
+}
+
 // A ZipArchive decompresses zip files from an input stream.
 type ZipArchive struct {
 	reader io.Reader
@@ -247,23 +356,46 @@ func NewZipArchive(inputReader io.Reader) ZipArchive {
 // Decompress reads from ZipArchive and writes files into the destination
 // specified.
 func (z ZipArchive) Decompress(destination string) error {
-	// Have to convert an io.Reader into a bytes.Reader which implements the
-	// ReadAt function making it compatible with the io.ReaderAt inteface which
-	// required for zip.NewReader
-	buff := bytes.NewBuffer(nil)
-	size, err := io.Copy(buff, z.reader)
+	// Struct and slice to collect symlinks and create them after all files have
+	// been created
+	type header struct {
+		name     string
+		linkname string
+		path     string
+	}
+
+	var symlinkHeaders []header
+
+	// Use an os.File to buffer the zip contents. This is needed because
+	// zip.NewReader requires an io.ReaderAt so that it can jump around within
+	// the file as it decompresses.
+	buffer, err := os.CreateTemp("", "")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(buffer.Name())
+
+	size, err := io.Copy(buffer, z.reader)
 	if err != nil {
 		return err
 	}
 
-	readerAt := bytes.NewReader(buff.Bytes())
-
-	zr, err := zip.NewReader(readerAt, size)
+	zr, err := zip.NewReader(buffer, size)
 	if err != nil {
 		return fmt.Errorf("failed to create zip reader: %w", err)
 	}
 
 	for _, f := range zr.File {
+		// Skip if the destination it the destination directory itself i.e. ./
+		if f.Name == "./" {
+			continue
+		}
+
+		err = checkExtractPath(f.Name, destination)
+		if err != nil {
+			return err
+		}
+
 		path := filepath.Join(destination, f.Name)
 
 		switch {
@@ -278,15 +410,19 @@ func (z ZipArchive) Decompress(destination string) error {
 				return err
 			}
 
-			content, err := ioutil.ReadAll(fd)
+			linkname, err := io.ReadAll(fd)
 			if err != nil {
 				return err
 			}
 
-			err = os.Symlink(string(content), path)
-			if err != nil {
-				return fmt.Errorf("failed to unzip symlink: %w", err)
-			}
+			// Collect all of the headers for symlinks so that they can be verified
+			// after all other files are written
+			symlinkHeaders = append(symlinkHeaders, header{
+				name:     f.Name,
+				linkname: string(linkname),
+				path:     path,
+			})
+
 		default:
 			err = os.MkdirAll(filepath.Dir(path), os.ModePerm)
 			if err != nil {
@@ -312,5 +448,60 @@ func (z ZipArchive) Decompress(destination string) error {
 		}
 	}
 
+	// Sort the symlinks so that symlinks of symlinks have their base link
+	// created before they are created.
+	//
+	// For example:
+	// b-sym -> a-sym/x
+	// a-sym -> z
+	// c-sym -> d-sym
+	// d-sym -> z
+	//
+	// Will sort to:
+	// a-sym -> z
+	// b-sym -> a-sym/x
+	// d-sym -> z
+	// c-sym -> d-sym
+	sort.Slice(symlinkHeaders, func(i, j int) bool {
+		if filepath.Clean(symlinkHeaders[i].name) == linknameFullPath(symlinkHeaders[j].name, symlinkHeaders[j].linkname) {
+			return true
+		}
+
+		if filepath.Clean(symlinkHeaders[j].name) == linknameFullPath(symlinkHeaders[i].name, symlinkHeaders[i].linkname) {
+			return false
+		}
+
+		return filepath.Clean(symlinkHeaders[i].name) < linknameFullPath(symlinkHeaders[j].name, symlinkHeaders[j].linkname)
+	})
+
+	for _, h := range symlinkHeaders {
+		// Check to see if the file that will be linked to is valid for symlinking
+		_, err := filepath.EvalSymlinks(linknameFullPath(h.path, h.linkname))
+		if err != nil {
+			return fmt.Errorf("failed to evaluate symlink %s: %w", h.path, err)
+		}
+
+		err = os.Symlink(h.linkname, h.path)
+		if err != nil {
+			return fmt.Errorf("failed to unzip symlink: %w", err)
+		}
+	}
+
 	return nil
+}
+
+// This function checks to see that the given path is within the destination
+// directory
+func checkExtractPath(tarFilePath string, destination string) error {
+	osPath := filepath.FromSlash(tarFilePath)
+	destpath := filepath.Join(destination, osPath)
+	if !strings.HasPrefix(destpath, filepath.Clean(destination)+string(os.PathSeparator)) {
+		return fmt.Errorf("illegal file path %q: the file path does not occur within the destination directory", tarFilePath)
+	}
+	return nil
+}
+
+// Generates the full path for a symlink from the linkname and the symlink path
+func linknameFullPath(path, linkname string) string {
+	return filepath.Clean(filepath.Join(filepath.Dir(path), linkname))
 }

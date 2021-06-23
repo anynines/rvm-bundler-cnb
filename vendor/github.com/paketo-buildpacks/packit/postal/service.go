@@ -3,12 +3,16 @@ package postal
 import (
 	"fmt"
 	"io"
+	"path/filepath"
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/Masterminds/semver/v3"
+	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/cargo"
+	"github.com/paketo-buildpacks/packit/postal/internal"
 	"github.com/paketo-buildpacks/packit/vacation"
 )
 
@@ -20,17 +24,31 @@ type Transport interface {
 	Drop(root, uri string) (io.ReadCloser, error)
 }
 
+//go:generate faux --interface MappingResolver --output fakes/mapping_resolver.go
+// MappingResolver serves as the interface that looks up platform binding provided
+// dependency mappings given a  SHA256 and a path to search for bindings
+type MappingResolver interface {
+	FindDependencyMapping(SHA256, bindingPath string) (string, error)
+}
+
 // Service provides a mechanism for resolving and installing dependencies given
 // a Transport.
 type Service struct {
-	transport Transport
+	transport       Transport
+	mappingResolver MappingResolver
 }
 
 // NewService creates an instance of a Servicel given a Transport.
 func NewService(transport Transport) Service {
 	return Service{
-		transport: transport,
+		transport:       transport,
+		mappingResolver: internal.NewDependencyMappingResolver(),
 	}
+}
+
+func (s Service) WithDependencyMappingResolver(mappingResolver MappingResolver) Service {
+	s.mappingResolver = mappingResolver
+	return s
 }
 
 // Resolve will pick the best matching dependency given a path to a
@@ -114,13 +132,22 @@ func (s Service) Resolve(path, id, version, stack string) (Dependency, error) {
 	return compatibleVersions[0], nil
 }
 
-// Install will fetch and expand a dependency into a layer path location. The
+// Deliver will fetch and expand a dependency into a layer path location. The
 // location of the CNBPath is given so that dependencies that may be included
-// in a buildpack when packaged for offline consumption can be retrieved. The
-// dependency is validated against the checksum value provided on the
-// Dependency and will error if there are inconsistencies in the fetched
-// result.
-func (s Service) Install(dependency Dependency, cnbPath, layerPath string) error {
+// in a buildpack when packaged for offline consumption can be retrieved. If
+// there is a dependency mapping for the specified dependency, Deliver will use
+// the given dependency mapping URI to fetch the dependency. The dependency is
+// validated against the checksum value provided on the Dependency and will
+// error if there are inconsistencies in the fetched result.
+func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath string) error {
+	dependencyMappingURI, err := s.mappingResolver.FindDependencyMapping(dependency.SHA256, filepath.Join(platformPath, "bindings"))
+	if err != nil {
+		return fmt.Errorf("failure checking out the bindings")
+	}
+	if dependencyMappingURI != "" {
+		dependency.URI = dependencyMappingURI
+	}
+
 	bundle, err := s.transport.Drop(cnbPath, dependency.URI)
 	if err != nil {
 		return fmt.Errorf("failed to fetch dependency: %s", err)
@@ -129,7 +156,7 @@ func (s Service) Install(dependency Dependency, cnbPath, layerPath string) error
 
 	validatedReader := cargo.NewValidatedReader(bundle, dependency.SHA256)
 
-	err = vacation.NewArchive(validatedReader).Decompress(layerPath)
+	err = vacation.NewArchive(validatedReader).StripComponents(dependency.StripComponents).Decompress(layerPath)
 	if err != nil {
 		return err
 	}
@@ -144,4 +171,36 @@ func (s Service) Install(dependency Dependency, cnbPath, layerPath string) error
 	}
 
 	return nil
+}
+
+// Install will invoke Deliver with a hardcoded value of /platform for the platform path.
+//
+// Deprecated: Use Deliver instead.
+func (s Service) Install(dependency Dependency, cnbPath, layerPath string) error {
+	return s.Deliver(dependency, cnbPath, layerPath, "/platform")
+}
+
+// GenerateBillOfMaterials will generate a list of BOMEntry values given a
+// collection of Dependency values.
+func (s Service) GenerateBillOfMaterials(dependencies ...Dependency) []packit.BOMEntry {
+	var entries []packit.BOMEntry
+	for _, dependency := range dependencies {
+		entry := packit.BOMEntry{
+			Name: dependency.Name,
+			Metadata: map[string]interface{}{
+				"sha256":  dependency.SHA256,
+				"stacks":  dependency.Stacks,
+				"uri":     dependency.URI,
+				"version": dependency.Version,
+			},
+		}
+
+		if (dependency.DeprecationDate != time.Time{}) {
+			entry.Metadata["deprecation-date"] = dependency.DeprecationDate
+		}
+
+		entries = append(entries, entry)
+	}
+
+	return entries
 }

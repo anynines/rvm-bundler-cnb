@@ -49,7 +49,6 @@ function run::build() {
 
       GOOS=linux \
         go build \
-          -mod=vendor \
           -ldflags="-s -w" \
           -o "run" \
             "${BUILDPACKDIR}/run"
@@ -77,7 +76,6 @@ function cmd::build() {
 
       GOOS="linux" \
         go build \
-          -mod=vendor \
           -ldflags="-s -w" \
           -o "${BUILDPACKDIR}/bin/${name}" \
             "${src}/main.go"
