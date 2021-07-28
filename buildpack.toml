@@ -1,6 +1,7 @@
-api = "0.2"
+api = "0.5"
 
 [buildpack]
+  homepage = "https://github.com/avarteqgmbh/rvm-bundler-cnb"
   id = "com.anynines.buildpacks.rvm-bundler"
   name = "RVM Buildpack for Bundler"
 
@@ -9,11 +10,11 @@ api = "0.2"
   pre-package = "./scripts/build.sh"
 
   [metadata.configuration]
-    default_bundler_version = "2.1.4"
+    default_bundler_version = "2.2.24"
 
     install_puma = true
     [metadata.configuration.puma]
-      version = "4.3.5"
+      version = "4.3.8"
       bind = "tcp://0.0.0.0:8080"
       workers = "5"
       threads = "5"

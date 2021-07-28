@@ -15,6 +15,7 @@ import (
 	"github.com/avarteqgmbh/rvm-cnb/rvm"
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/chronos"
+	"github.com/paketo-buildpacks/packit/fs"
 )
 
 //go:generate faux --interface Calculator --output fakes/calculator.go
@@ -33,11 +34,26 @@ type Calculator interface {
 }
 
 // InstallBundler install bundler in a given RVM environment
+//
+// To configure the Bundler environment, InstallBundler will copy the local
+// Bundler configuration, if any, into the target layer path. The configuration
+// file created in the layer will become the defacto configuration file by
+// setting `BUNDLE_USER_CONFIG` in the local environment while executing the
+// subsequent Bundle CLI commands. The configuration will then be modifed with
+// any settings specific to the invocation of Execute.  These configurations
+// will override any settings previously applied in the local Bundle
+// configuration.
 func InstallBundler(context packit.BuildContext, configuration Configuration, logger rvm.LogEmitter, versionResolver VersionResolver, calculator Calculator) (packit.BuildResult, error) {
 	logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 	logger.Process("default Bundler version: %s\n", bundlerVersion(context, configuration))
 
 	clock := chronos.DefaultClock
+
+	bundlerMajorVersion, err := strconv.Atoi(bundlerVersion(context, configuration)[:1])
+	if err != nil {
+		logger.Process("Failed to determine bundler major version")
+		return packit.BuildResult{}, err
+	}
 
 	bundlerLayer, err := context.Layers.Get("rvm-bundler")
 	if err != nil {
@@ -53,15 +69,44 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
+	localConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config")
+	backupConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config.bak")
+	globalConfigPath := filepath.Join(bundlerLayer.Path, "config")
+
+	err = os.RemoveAll(globalConfigPath)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
+	if _, err := os.Stat(localConfigPath); err == nil {
+		err := os.MkdirAll(bundlerLayer.Path, os.ModePerm)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
+		if _, err := os.Stat(backupConfigPath); err == nil {
+			err = fs.Copy(backupConfigPath, localConfigPath)
+			if err != nil {
+				return packit.BuildResult{}, err
+			}
+		}
+
+		err = fs.Copy(localConfigPath, globalConfigPath)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+
+		err = fs.Copy(localConfigPath, backupConfigPath)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
+	}
+
+	os.Setenv("BUNDLE_USER_CONFIG", globalConfigPath)
+
 	if should {
 		timeStartInstall := clock.Now()
 		logger.Process("Installing Bundler version '%s'", bundlerVersion(context, configuration))
-
-		bundlerMajorVersion, err := strconv.Atoi(bundlerVersion(context, configuration)[:1])
-		if err != nil {
-			logger.Process("Failed to determine bundler major version")
-			return packit.BuildResult{}, err
-		}
 
 		rubyGemsVersion := ""
 		if bundlerMajorVersion == 1 {
@@ -164,9 +209,17 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	} else {
 		logger.Process("Reusing cached layer %s", bundlerLayer.Path)
 		logger.Break()
+
+		err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion)
+		if err != nil {
+			return packit.BuildResult{}, err
+		}
 	}
+
+	bundlerLayer.BuildEnv.Default("BUNDLE_USER_CONFIG", filepath.Join(bundlerLayer.Path, "config"))
+	bundlerLayer.LaunchEnv.Default("BUNDLE_USER_CONFIG", filepath.Join(bundlerLayer.Path, "config"))
+
 	buildResult := packit.BuildResult{
-		Plan: context.Plan,
 		Layers: []packit.Layer{
 			bundlerLayer,
 		},
