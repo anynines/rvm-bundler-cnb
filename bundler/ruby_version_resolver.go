@@ -17,12 +17,12 @@ func NewRubyVersionResolver() RubyVersionResolver {
 }
 
 // Lookup returns the version of Ruby installed in the build environment.
-func (r RubyVersionResolver) Lookup(workingDir string) (string, error) {
+func (r RubyVersionResolver) Lookup(workingDir string, bashcmd BashCmd) (string, error) {
 	getRubyVersionCmd := strings.Join([]string{
 		"rvm",
 		"current",
 	}, " ")
-	cmdStdOut, err := RunBashCmd(getRubyVersionCmd, workingDir)
+	cmdStdOut, err := bashcmd.RunBashCmd(getRubyVersionCmd, workingDir)
 	if err != nil {
 		return "", fmt.Errorf("failed to obtain ruby version: %w: %s", err, cmdStdOut)
 	}

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/paketo-buildpacks/packit/pexec"
+	"github.com/paketo-buildpacks/packit/v2/pexec"
 )
 
 //go:generate faux --interface Executable --output fakes/executable.go
@@ -58,13 +58,16 @@ type PackBuild struct {
 	verbose bool
 	noColor bool
 
-	buildpacks   []string
-	network      string
-	builder      string
-	clearCache   bool
-	env          map[string]string
-	trustBuilder bool
-	pullPolicy   string
+	buildpacks    []string
+	network       string
+	builder       string
+	clearCache    bool
+	env           map[string]string
+	trustBuilder  bool
+	pullPolicy    string
+	sbomOutputDir string
+	volumes       []string
+	gid           string
 
 	// TODO: remove after deprecation period
 	noPull bool
@@ -95,6 +98,11 @@ func (pb PackBuild) WithEnv(env map[string]string) PackBuild {
 	return pb
 }
 
+func (pb PackBuild) WithGID(gid string) PackBuild {
+	pb.gid = gid
+	return pb
+}
+
 // Deprecated: Use WithPullPolicy("never") instead.
 func (pb PackBuild) WithNoPull() PackBuild {
 	pb.noPull = true
@@ -106,8 +114,18 @@ func (pb PackBuild) WithPullPolicy(pullPolicy string) PackBuild {
 	return pb
 }
 
+func (pb PackBuild) WithSBOMOutputDir(output string) PackBuild {
+	pb.sbomOutputDir = output
+	return pb
+}
+
 func (pb PackBuild) WithTrustBuilder() PackBuild {
 	pb.trustBuilder = true
+	return pb
+}
+
+func (pb PackBuild) WithVolumes(volumes ...string) PackBuild {
+	pb.volumes = append(pb.volumes, volumes...)
 	return pb
 }
 
@@ -161,8 +179,20 @@ func (pb PackBuild) Execute(name, path string) (Image, fmt.Stringer, error) {
 		args = append(args, "--pull-policy", pb.pullPolicy)
 	}
 
+	if pb.sbomOutputDir != "" {
+		args = append(args, "--sbom-output-dir", pb.sbomOutputDir)
+	}
+
 	if pb.trustBuilder {
 		args = append(args, "--trust-builder")
+	}
+
+	for _, volume := range pb.volumes {
+		args = append(args, "--volume", volume)
+	}
+
+	if pb.gid != "" {
+		args = append(args, "--gid", pb.gid)
 	}
 
 	buildLogBuffer := bytes.NewBuffer(nil)

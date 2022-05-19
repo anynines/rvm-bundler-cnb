@@ -1,36 +1,44 @@
 package bundler
 
 import (
-	"bufio"
-	"bytes"
-	"fmt"
-	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/avarteqgmbh/rvm-cnb/rvm"
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/chronos"
 	"github.com/paketo-buildpacks/packit/fs"
+	"github.com/paketo-buildpacks/packit/scribe"
 )
 
 //go:generate faux --interface Calculator --output fakes/calculator.go
 //go:generate faux --interface VersionResolver --output fakes/version_resolver.go
+//go:generate faux --interface BashCmd --output fakes/bash_cmd.go
+//go:generate faux --interface PumaInstaller --output fakes/puma.go
 
 // VersionResolver defines the interface for looking up and comparing the
 // versions of Ruby installed in the environment.
 type VersionResolver interface {
-	Lookup(workingDir string) (version string, err error)
+	Lookup(workingDir string, bashcmd BashCmd) (version string, err error)
 }
 
 // Calculator defines the interface for calculating a checksum of the given set
 // of file paths.
 type Calculator interface {
 	Sum(paths ...string) (string, error)
+}
+
+// BashCmd defines the interface for running a bash command.
+type BashCmd interface {
+	RunBashCmd(command string, WorkingDir string) (string, error)
+}
+
+// PumaInst defines the interface for running a bash command.
+type PumaInstaller interface {
+	InstallPuma(context packit.BuildContext, configuration Configuration, logger scribe.Logger) error
+	CreatePumaProcess(context packit.BuildContext, configuration Configuration, logger scribe.Logger) (packit.Process, error)
 }
 
 // InstallBundler install bundler in a given RVM environment
@@ -43,7 +51,7 @@ type Calculator interface {
 // any settings specific to the invocation of Execute.  These configurations
 // will override any settings previously applied in the local Bundle
 // configuration.
-func InstallBundler(context packit.BuildContext, configuration Configuration, logger rvm.LogEmitter, versionResolver VersionResolver, calculator Calculator) (packit.BuildResult, error) {
+func InstallBundler(context packit.BuildContext, configuration Configuration, logger scribe.Logger, versionResolver VersionResolver, calculator Calculator, bashcmd BashCmd, pumainstaller PumaInstaller) (packit.BuildResult, error) {
 	logger.Title("%s %s", context.BuildpackInfo.Name, context.BuildpackInfo.Version)
 	logger.Process("default Bundler version: %s\n", bundlerVersion(context, configuration))
 
@@ -64,7 +72,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	bundlerLayer.Cache = true
 	bundlerLayer.Launch = true
 
-	should, checksum, rubyVersion, err := ShouldRun(bundlerLayer.Metadata, context.WorkingDir, versionResolver, calculator)
+	should, checksum, rubyVersion, err := ShouldRun(bundlerLayer.Metadata, context.WorkingDir, versionResolver, calculator, bashcmd)
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
@@ -126,7 +134,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 				rubyGemsVersion,
 			}, " ")
 		}
-		_, err = RunBashCmd(installRubyGemsUpdateSystemCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(installRubyGemsUpdateSystemCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -138,18 +146,18 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 			"--system",
 			rubyGemsVersion,
 		}, " ")
-		_, err = RunBashCmd(gemUpdateSystemCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(gemUpdateSystemCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
 
 		gemCleanupCmd := strings.Join([]string{"gem", "cleanup"}, " ")
-		_, err = RunBashCmd(gemCleanupCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(gemCleanupCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
 
-		err = InstallPuma(context, configuration, logger)
+		err = pumainstaller.InstallPuma(context, configuration, logger)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -168,12 +176,12 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 				bundlerVersion(context, configuration),
 			}, " ")
 		}
-		_, err = RunBashCmd(gemInstallBundlerCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(gemInstallBundlerCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
 
-		err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion)
+		err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion, bashcmd)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -182,7 +190,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 			"bundle",
 			"install",
 		}, " ")
-		_, err = RunBashCmd(bundleInstallCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(bundleInstallCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -191,7 +199,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 			"bundle",
 			"clean",
 		}, " ")
-		_, err = RunBashCmd(bundleCleanCmd, context.WorkingDir)
+		_, err = bashcmd.RunBashCmd(bundleCleanCmd, context.WorkingDir)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -210,7 +218,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		logger.Process("Reusing cached layer %s", bundlerLayer.Path)
 		logger.Break()
 
-		err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion)
+		err = configureBundlerPath(context, bundlerLayer, bundlerMajorVersion, bashcmd)
 		if err != nil {
 			return packit.BuildResult{}, err
 		}
@@ -225,70 +233,11 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		},
 	}
 
-	pumaProcess, err := CreatePumaProcess(context, configuration, logger)
+	pumaProcess, err := pumainstaller.CreatePumaProcess(context, configuration, logger)
 	if err == nil && pumaProcess.Type == "web" && pumaProcess.Command != "" {
 		buildResult.Launch.Processes = append(buildResult.Launch.Processes, pumaProcess)
 	}
 	return buildResult, nil
-}
-
-// RunBashCmd executes a command in an interactive BASH shell
-func RunBashCmd(command string, WorkingDir string) (string, error) {
-	logger := rvm.NewLogEmitter(os.Stdout)
-	stdout := ""
-
-	cmd := exec.Command("bash")
-	cmd.Dir = WorkingDir
-	cmd.Args = append(
-		cmd.Args,
-		"--login",
-		"-c",
-		strings.Join(
-			[]string{
-				"source",
-				filepath.Join(os.ExpandEnv("$rvm_path"), "profile.d", "rvm"),
-				"&&",
-				command,
-			},
-			" ",
-		),
-	)
-	cmd.Env = os.Environ()
-
-	logger.Process("Executing: %s", strings.Join(cmd.Args, " "))
-
-	stdoutPipe, _ := cmd.StdoutPipe()
-	var stderrBuf bytes.Buffer
-	cmd.Stderr = io.MultiWriter(&stderrBuf)
-
-	if err := cmd.Start(); err != nil {
-		logger.Process("Failed to start command: %s", cmd.String())
-		logger.Break()
-		return "", err
-	}
-
-	stdoutReader := bufio.NewReader(stdoutPipe)
-	stdoutLine, err := stdoutReader.ReadString('\n')
-	for err == nil {
-		logger.Subprocess(stdoutLine)
-		stdout = fmt.Sprintf("%s%s%s", stdout, stdoutLine, "\n")
-		stdoutLine, err = stdoutReader.ReadString('\n')
-	}
-	err = cmd.Wait()
-
-	if err != nil {
-		logger.Process("Command failed: %s", cmd.String())
-		logger.Process("Error status code: %s", err.Error())
-		if len(stderrBuf.String()) > 0 {
-			logger.Process("Command output on stderr:")
-			logger.Subprocess(stderrBuf.String())
-		}
-		return "", err
-	}
-
-	logger.Break()
-
-	return stdout, nil
 }
 
 func bundlerVersion(context packit.BuildContext, configuration Configuration) string {
@@ -303,13 +252,13 @@ func bundlerVersion(context packit.BuildContext, configuration Configuration) st
 	return bundlerVersion
 }
 
-func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer, bundlerMajorVersion int) error {
+func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer, bundlerMajorVersion int, bashcmd BashCmd) error {
 	cmdComponents := []string{"bundle", "config"}
 	if bundlerMajorVersion > 1 {
 		cmdComponents = append(cmdComponents, "set")
 	}
 	cmdComponents = append(cmdComponents, "--local", "path", bundlerLayer.Path)
-	_, err := RunBashCmd(strings.Join(cmdComponents, " "), context.WorkingDir)
+	_, err := bashcmd.RunBashCmd(strings.Join(cmdComponents, " "), context.WorkingDir)
 	if err != nil {
 		return err
 	}
@@ -326,9 +275,9 @@ func configureBundlerPath(context packit.BuildContext, bundlerLayer packit.Layer
 // In addition to reporting if the install process should execute, this method
 // will return the current version of Ruby and the checksum of the Gemfile and
 // Gemfile.lock contents.
-func ShouldRun(metadata map[string]interface{}, workingDir string, versionResolver VersionResolver, calculator Calculator) (bool, string, string, error) {
+func ShouldRun(metadata map[string]interface{}, workingDir string, versionResolver VersionResolver, calculator Calculator, bashcmd BashCmd) (bool, string, string, error) {
 
-	rubyVersion, err := versionResolver.Lookup(workingDir)
+	rubyVersion, err := versionResolver.Lookup(workingDir, bashcmd)
 	if err != nil {
 		return false, "", "", err
 	}

@@ -22,6 +22,7 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		Expect = NewWithT(t).Expect
 
 		cnbDir     string
+		cnbErrDir  string
 		workingDir string
 
 		bundlerVersionParser *fakes.VersionParser
@@ -49,6 +50,9 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		it.Before(func() {
 			var err error
 			cnbDir, err = ioutil.TempDir("", "cnb")
+			Expect(err).NotTo(HaveOccurred())
+
+			cnbErrDir, err = ioutil.TempDir("", "cnb")
 			Expect(err).NotTo(HaveOccurred())
 
 			someBuildPackTomlFile, err := ioutil.ReadFile("../test/fixtures/some_buildpack.toml")
@@ -87,6 +91,14 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 					},
 				},
 			}))
+		})
+
+		it("fails on absent buildpack.toml file", func() {
+			_, err := detect(packit.DetectContext{
+				CNBPath:    cnbErrDir,
+				WorkingDir: workingDir,
+			})
+			Expect(err).To(HaveOccurred())
 		})
 
 		it("returns a plan that provides RVM, requires node and determines the ruby version by reading Gemfile.lock", func() {

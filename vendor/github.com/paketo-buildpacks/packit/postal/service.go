@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/Masterminds/semver/v3"
+
 	"github.com/paketo-buildpacks/packit"
 	"github.com/paketo-buildpacks/packit/cargo"
 	"github.com/paketo-buildpacks/packit/postal/internal"
+	"github.com/paketo-buildpacks/packit/servicebindings"
 	"github.com/paketo-buildpacks/packit/vacation"
 )
 
@@ -26,9 +28,9 @@ type Transport interface {
 
 //go:generate faux --interface MappingResolver --output fakes/mapping_resolver.go
 // MappingResolver serves as the interface that looks up platform binding provided
-// dependency mappings given a  SHA256 and a path to search for bindings
+// dependency mappings given a SHA256
 type MappingResolver interface {
-	FindDependencyMapping(SHA256, bindingPath string) (string, error)
+	FindDependencyMapping(SHA256, platformDir string) (string, error)
 }
 
 // Service provides a mechanism for resolving and installing dependencies given
@@ -38,11 +40,13 @@ type Service struct {
 	mappingResolver MappingResolver
 }
 
-// NewService creates an instance of a Servicel given a Transport.
+// NewService creates an instance of a Service given a Transport.
 func NewService(transport Transport) Service {
 	return Service{
-		transport:       transport,
-		mappingResolver: internal.NewDependencyMappingResolver(),
+		transport: transport,
+		mappingResolver: internal.NewDependencyMappingResolver(
+			servicebindings.NewResolver(),
+		),
 	}
 }
 
@@ -116,9 +120,10 @@ func (s Service) Resolve(path, id, version, stack string) (Dependency, error) {
 
 	if len(compatibleVersions) == 0 {
 		return Dependency{}, fmt.Errorf(
-			"failed to satisfy %q dependency version constraint %q: no compatible versions. Supported versions are: [%s]",
+			"failed to satisfy %q dependency version constraint %q: no compatible versions on %q stack. Supported versions are: [%s]",
 			id,
 			version,
+			stack,
 			strings.Join(supportedVersions, ", "),
 		)
 	}
@@ -140,10 +145,11 @@ func (s Service) Resolve(path, id, version, stack string) (Dependency, error) {
 // validated against the checksum value provided on the Dependency and will
 // error if there are inconsistencies in the fetched result.
 func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath string) error {
-	dependencyMappingURI, err := s.mappingResolver.FindDependencyMapping(dependency.SHA256, filepath.Join(platformPath, "bindings"))
+	dependencyMappingURI, err := s.mappingResolver.FindDependencyMapping(dependency.SHA256, platformPath)
 	if err != nil {
-		return fmt.Errorf("failure checking out the bindings")
+		return fmt.Errorf("failure checking for dependency mappings: %s", err)
 	}
+
 	if dependencyMappingURI != "" {
 		dependency.URI = dependencyMappingURI
 	}
@@ -156,7 +162,8 @@ func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath
 
 	validatedReader := cargo.NewValidatedReader(bundle, dependency.SHA256)
 
-	err = vacation.NewArchive(validatedReader).StripComponents(dependency.StripComponents).Decompress(layerPath)
+	name := filepath.Base(dependency.URI)
+	err = vacation.NewArchive(validatedReader).WithName(name).StripComponents(dependency.StripComponents).Decompress(layerPath)
 	if err != nil {
 		return err
 	}
@@ -185,18 +192,40 @@ func (s Service) Install(dependency Dependency, cnbPath, layerPath string) error
 func (s Service) GenerateBillOfMaterials(dependencies ...Dependency) []packit.BOMEntry {
 	var entries []packit.BOMEntry
 	for _, dependency := range dependencies {
+
 		entry := packit.BOMEntry{
 			Name: dependency.Name,
-			Metadata: map[string]interface{}{
-				"sha256":  dependency.SHA256,
-				"stacks":  dependency.Stacks,
-				"uri":     dependency.URI,
-				"version": dependency.Version,
+			Metadata: packit.BOMMetadata{
+				Checksum: packit.BOMChecksum{
+					Algorithm: packit.SHA256,
+					Hash:      dependency.SHA256,
+				},
+				URI:     dependency.URI,
+				Version: dependency.Version,
+				Source: packit.BOMSource{
+					Checksum: packit.BOMChecksum{
+						Algorithm: packit.SHA256,
+						Hash:      dependency.SourceSHA256,
+					},
+					URI: dependency.Source,
+				},
 			},
 		}
 
+		if dependency.CPE != "" {
+			entry.Metadata.CPE = dependency.CPE
+		}
+
 		if (dependency.DeprecationDate != time.Time{}) {
-			entry.Metadata["deprecation-date"] = dependency.DeprecationDate
+			entry.Metadata.DeprecationDate = dependency.DeprecationDate
+		}
+
+		if dependency.Licenses != nil {
+			entry.Metadata.Licenses = dependency.Licenses
+		}
+
+		if dependency.PURL != "" {
+			entry.Metadata.PURL = dependency.PURL
 		}
 
 		entries = append(entries, entry)

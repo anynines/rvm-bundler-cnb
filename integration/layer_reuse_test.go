@@ -183,7 +183,7 @@ func testLayerReuse(t *testing.T, context spec.G, it spec.S) {
 				Expect(err).NotTo(HaveOccurred())
 
 				err = ioutil.WriteFile(filepath.Join(source, "Gemfile.lock"),
-					[]byte(string(contents)+"\nbreak checksum"), 0600)
+					[]byte(string(contents)+"\n"), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
 				// Second pack build
