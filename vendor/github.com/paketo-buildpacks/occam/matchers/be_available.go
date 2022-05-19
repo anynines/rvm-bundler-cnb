@@ -8,6 +8,8 @@ import (
 	"github.com/paketo-buildpacks/occam"
 )
 
+// BeAvailable matches if the actual occam.Container is running AND an
+// HTTP request to at least one of its exposed ports completes without error.
 func BeAvailable() types.GomegaMatcher {
 	return &BeAvailableMatcher{
 		Docker: occam.NewDocker(),
@@ -26,7 +28,7 @@ func (*BeAvailableMatcher) Match(actual interface{}) (bool, error) {
 
 	// Get a container port in order to look up the corresponding host port.
 	for port := range container.Ports {
-		response, err := http.Get(fmt.Sprintf("http://localhost:%s", container.HostPort(port)))
+		response, err := http.Get(fmt.Sprintf("http://%s:%s", container.Host(), container.HostPort(port)))
 		if response != nil {
 			response.Body.Close()
 		}

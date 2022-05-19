@@ -8,13 +8,21 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/avarteqgmbh/rvm-cnb/rvm"
 	"github.com/paketo-buildpacks/packit"
+	"github.com/paketo-buildpacks/packit/scribe"
 )
+
+// PumaGemInstaller represents a new puma gem installer
+type PumaGemInstaller struct{}
+
+// NewPumaInstaller creates a new puma gem installer
+func NewPumaInstaller() PumaGemInstaller {
+	return PumaGemInstaller{}
+}
 
 // InstallPuma install the Puma gem and creates a workingDir/config/puma.rb if
 // the file doesn't exist already
-func InstallPuma(context packit.BuildContext, configuration Configuration, logger rvm.LogEmitter) error {
+func (p PumaGemInstaller) InstallPuma(context packit.BuildContext, configuration Configuration, logger scribe.Logger) error {
 	if !configuration.InstallPuma {
 		return nil
 	}
@@ -81,7 +89,7 @@ func InstallPuma(context packit.BuildContext, configuration Configuration, logge
 // CreatePumaProcess creates a packit.Process if this buildpack is configured
 // to do so. If there is a Procfile in the application's directory and it
 // it contains a process of type "web:", then no packit.Process will be returned
-func CreatePumaProcess(context packit.BuildContext, configuration Configuration, logger rvm.LogEmitter) (packit.Process, error) {
+func (p PumaGemInstaller) CreatePumaProcess(context packit.BuildContext, configuration Configuration, logger scribe.Logger) (packit.Process, error) {
 	installPumaCommand := true
 	procfile, err := os.Open(filepath.Join(context.WorkingDir, "Procfile"))
 	if err == nil {

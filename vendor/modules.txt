@@ -1,85 +1,107 @@
-# github.com/BurntSushi/toml v0.3.1
-## explicit
+# github.com/BurntSushi/toml v1.1.0
+## explicit; go 1.16
 github.com/BurntSushi/toml
-# github.com/ForestEckhardt/freezer v0.0.7
+github.com/BurntSushi/toml/internal
+# github.com/ForestEckhardt/freezer v0.0.10
+## explicit; go 1.16
 github.com/ForestEckhardt/freezer
 github.com/ForestEckhardt/freezer/github
 # github.com/Masterminds/semver/v3 v3.1.1
+## explicit; go 1.12
 github.com/Masterminds/semver/v3
-# github.com/VividCortex/ewma v1.1.1
+# github.com/VividCortex/ewma v1.2.0
+## explicit; go 1.12
 github.com/VividCortex/ewma
-# github.com/avarteqgmbh/rvm-cnb v0.1.15-0.20210303094507-dc09d9e26d3d
-## explicit
+# github.com/avarteqgmbh/rvm-cnb v0.1.15
+## explicit; go 1.15
 github.com/avarteqgmbh/rvm-cnb/rvm
 github.com/avarteqgmbh/rvm-cnb/rvm/fakes
 # github.com/cheggaaa/pb/v3 v3.0.8
+## explicit; go 1.12
 github.com/cheggaaa/pb/v3
 github.com/cheggaaa/pb/v3/termutil
-# github.com/fatih/color v1.10.0
+# github.com/fatih/color v1.13.0
+## explicit; go 1.13
 github.com/fatih/color
-# github.com/gabriel-vasile/mimetype v1.3.0
+# github.com/gabriel-vasile/mimetype v1.4.0
+## explicit; go 1.12
 github.com/gabriel-vasile/mimetype
 github.com/gabriel-vasile/mimetype/internal/charset
 github.com/gabriel-vasile/mimetype/internal/json
 github.com/gabriel-vasile/mimetype/internal/magic
-# github.com/mattn/go-colorable v0.1.8
+# github.com/mattn/go-colorable v0.1.12
+## explicit; go 1.13
 github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.12
+# github.com/mattn/go-isatty v0.0.14
+## explicit; go 1.12
 github.com/mattn/go-isatty
-# github.com/mattn/go-runewidth v0.0.12
+# github.com/mattn/go-runewidth v0.0.13
+## explicit; go 1.9
 github.com/mattn/go-runewidth
 # github.com/oklog/ulid v1.3.1
-github.com/oklog/ulid
-# github.com/onsi/gomega v1.13.0
 ## explicit
+github.com/oklog/ulid
+# github.com/onsi/gomega v1.18.1
+## explicit; go 1.16
 github.com/onsi/gomega
 github.com/onsi/gomega/format
-github.com/onsi/gomega/internal/assertion
-github.com/onsi/gomega/internal/asyncassertion
-github.com/onsi/gomega/internal/defaults
-github.com/onsi/gomega/internal/oraclematcher
-github.com/onsi/gomega/internal/testingtsupport
+github.com/onsi/gomega/internal
+github.com/onsi/gomega/internal/gutil
 github.com/onsi/gomega/matchers
 github.com/onsi/gomega/matchers/support/goraph/bipartitegraph
 github.com/onsi/gomega/matchers/support/goraph/edge
 github.com/onsi/gomega/matchers/support/goraph/node
 github.com/onsi/gomega/matchers/support/goraph/util
 github.com/onsi/gomega/types
-# github.com/paketo-buildpacks/occam v0.1.3
-## explicit
+# github.com/paketo-buildpacks/occam v0.7.0
+## explicit; go 1.13
 github.com/paketo-buildpacks/occam
 github.com/paketo-buildpacks/occam/matchers
-# github.com/paketo-buildpacks/packit v0.13.0
-## explicit
+github.com/paketo-buildpacks/occam/packagers
+# github.com/paketo-buildpacks/packit v1.3.1
+## explicit; go 1.16
 github.com/paketo-buildpacks/packit
 github.com/paketo-buildpacks/packit/cargo
 github.com/paketo-buildpacks/packit/chronos
 github.com/paketo-buildpacks/packit/fs
 github.com/paketo-buildpacks/packit/internal
-github.com/paketo-buildpacks/packit/pexec
 github.com/paketo-buildpacks/packit/postal
 github.com/paketo-buildpacks/packit/postal/internal
 github.com/paketo-buildpacks/packit/scribe
+github.com/paketo-buildpacks/packit/servicebindings
 github.com/paketo-buildpacks/packit/vacation
+# github.com/paketo-buildpacks/packit/v2 v2.1.0
+## explicit; go 1.16
+github.com/paketo-buildpacks/packit/v2/fs
+github.com/paketo-buildpacks/packit/v2/pexec
+github.com/paketo-buildpacks/packit/v2/vacation
+# github.com/pelletier/go-toml v1.9.4
+## explicit; go 1.12
+github.com/pelletier/go-toml
 # github.com/rivo/uniseg v0.2.0
+## explicit; go 1.12
 github.com/rivo/uniseg
 # github.com/sclevine/spec v1.4.0
-## explicit
+## explicit; go 1.13
 github.com/sclevine/spec
 github.com/sclevine/spec/report
 # github.com/ulikunitz/xz v0.5.10
+## explicit; go 1.12
 github.com/ulikunitz/xz
 github.com/ulikunitz/xz/internal/hash
 github.com/ulikunitz/xz/internal/xlog
 github.com/ulikunitz/xz/lzma
-# golang.org/x/net v0.0.0-20210505024714-0287a6fb4125
+# golang.org/x/net v0.0.0-20220403103023-749bd193bc2b
+## explicit; go 1.17
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/html/charset
-# golang.org/x/sys v0.0.0-20210423082822-04245dca01da
+# golang.org/x/sys v0.0.0-20220406163625-3f8b81556e12
+## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/unix
-# golang.org/x/text v0.3.6
+# golang.org/x/text v0.3.7
+## explicit; go 1.17
 golang.org/x/text/encoding
 golang.org/x/text/encoding/charmap
 golang.org/x/text/encoding/htmlindex
@@ -98,5 +120,5 @@ golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
 # gopkg.in/yaml.v2 v2.4.0
-## explicit
+## explicit; go 1.15
 gopkg.in/yaml.v2

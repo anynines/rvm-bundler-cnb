@@ -77,7 +77,7 @@ func testDefault(t *testing.T, context spec.G, it spec.S) {
 			Eventually(container).Should(BeAvailable())
 
 			// Expected the most recent version of `bundler`, because `gems` are updated to the most recent version
-			Eventually(container).Should(Serve(ContainSubstring("/layers/com.anynines.buildpacks.rvm/rvm/gems/")).OnPort(8080))
+			Eventually(container).Should(Serve(ContainSubstring("/layers/com.anynines.buildpacks.rvm/rvm/rubies/ruby-")).OnPort(8080))
 			Eventually(container).Should(Serve(MatchRegexp(`Bundler version 2\.\d+\.\d+`)).OnPort(8080))
 
 			Expect(logs).To(ContainLines(

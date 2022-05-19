@@ -14,5 +14,7 @@ func TestUnitBundler(t *testing.T) {
 	suite("BuildpackYMLParser", testBuildpackYMLParser)
 	suite("Detect", testDetect)
 	suite("Bundler", testBundler)
+	suite("Puma", testPuma)
+	suite("RubyVersionResolver", testRubyVersionResolver)
 	suite.Run(t)
 }

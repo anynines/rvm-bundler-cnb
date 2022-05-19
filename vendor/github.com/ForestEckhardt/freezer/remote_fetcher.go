@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 
 	"github.com/ForestEckhardt/freezer/github"
-	"github.com/paketo-buildpacks/packit/vacation"
+	"github.com/paketo-buildpacks/packit/v2/vacation"
 )
 
 //go:generate faux --interface GitReleaseFetcher --output fakes/git_release_fetcher.go
@@ -43,6 +43,11 @@ func NewRemoteFetcher(buildpackCache BuildpackCache, gitReleaseFetcher GitReleas
 		packager:          packager,
 		fileSystem:        fileSystem,
 	}
+}
+
+func (r RemoteFetcher) WithPackager(packager Packager) RemoteFetcher {
+	r.packager = packager
+	return r
 }
 
 func (r RemoteFetcher) Get(buildpack RemoteBuildpack) (string, error) {
@@ -99,7 +104,7 @@ func (r RemoteFetcher) Get(buildpack RemoteBuildpack) (string, error) {
 			}
 			defer os.RemoveAll(downloadDir)
 
-			err = vacation.NewTarGzipArchive(bundle).StripComponents(1).Decompress(downloadDir)
+			err = vacation.NewArchive(bundle).StripComponents(1).Decompress(downloadDir)
 			if err != nil {
 				return "", err
 			}
