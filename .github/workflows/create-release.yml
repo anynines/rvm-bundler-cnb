@@ -56,7 +56,7 @@ jobs:
         token: ${{ github.token }}
     - name: Tag
       id: tag
-      uses: paketo-buildpacks/github-config/actions/tag/increment-tag@b935ce32a10f97eb94fdad03220dd19c5645a2f0
+      uses: paketo-buildpacks/github-config/actions/tag/increment-tag@main
       with:
         current_version: ${{ steps.reset.outputs.current_version }}
     - name: Package
