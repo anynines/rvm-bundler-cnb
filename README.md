@@ -13,4 +13,4 @@ This CNB requires the [RVM CNB](https://github.com/avarteqgmbh/rvm-cnb) as a dep
 
 ## TODO
 
-1. Add configuration options for bundler.
+1. Add configuration options for bundler. 
