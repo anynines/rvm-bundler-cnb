@@ -5,16 +5,16 @@ import (
 
 	"github.com/avarteqgmbh/rvm-bundler-cnb/bundler"
 
-	"github.com/paketo-buildpacks/packit"
-	"github.com/paketo-buildpacks/packit/fs"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/packit/v2/fs"
+	"github.com/paketo-buildpacks/packit/v2/scribe"
 )
 
 func main() {
-	logEmitter := scribe.NewLogger(os.Stdout)
+	logger := scribe.NewLogger(os.Stdout)
 	vr := bundler.NewRubyVersionResolver()
 	calc := fs.NewChecksumCalculator()
 	bc := bundler.NewRunBashCmd()
 	pm := bundler.NewPumaInstaller()
-	packit.Build(bundler.Build(logEmitter, vr, calc, bc, pm))
+	packit.Build(bundler.Build(logger, vr, calc, bc, pm))
 }

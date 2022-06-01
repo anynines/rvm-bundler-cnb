@@ -32,7 +32,7 @@ func ReadConfiguration(cnbPath string) (Configuration, error) {
 	}
 
 	var meta MetaData
-	_, err = toml.DecodeReader(file, &meta)
+	_, err = toml.NewDecoder(file).Decode(&meta)
 	if err != nil {
 		return Configuration{}, err
 	}

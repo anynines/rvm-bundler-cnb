@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/paketo-buildpacks/packit"
-	"github.com/paketo-buildpacks/packit/chronos"
-	"github.com/paketo-buildpacks/packit/fs"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/packit/v2/chronos"
+	"github.com/paketo-buildpacks/packit/v2/fs"
+	"github.com/paketo-buildpacks/packit/v2/scribe"
 )
 
 //go:generate faux --interface Calculator --output fakes/calculator.go
@@ -57,6 +57,9 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 
 	clock := chronos.DefaultClock
 
+	var buildMetadata packit.BuildMetadata
+	var launchMetadata packit.LaunchMetadata
+
 	bundlerMajorVersion, err := strconv.Atoi(bundlerVersion(context, configuration)[:1])
 	if err != nil {
 		logger.Process("Failed to determine bundler major version")
@@ -67,10 +70,6 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	if err != nil {
 		return packit.BuildResult{}, err
 	}
-
-	bundlerLayer.Build = true
-	bundlerLayer.Cache = true
-	bundlerLayer.Launch = true
 
 	should, checksum, rubyVersion, err := ShouldRun(bundlerLayer.Metadata, context.WorkingDir, versionResolver, calculator, bashcmd)
 	if err != nil {
@@ -227,10 +226,12 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 	bundlerLayer.BuildEnv.Default("BUNDLE_USER_CONFIG", filepath.Join(bundlerLayer.Path, "config"))
 	bundlerLayer.LaunchEnv.Default("BUNDLE_USER_CONFIG", filepath.Join(bundlerLayer.Path, "config"))
 
+	bundlerLayer.Build, bundlerLayer.Cache, bundlerLayer.Launch = true, true, true
+
 	buildResult := packit.BuildResult{
-		Layers: []packit.Layer{
-			bundlerLayer,
-		},
+		Layers: []packit.Layer{bundlerLayer},
+		Build:  buildMetadata,
+		Launch: launchMetadata,
 	}
 
 	pumaProcess, err := pumainstaller.CreatePumaProcess(context, configuration, logger)

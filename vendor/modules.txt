@@ -43,20 +43,13 @@ github.com/Microsoft/hcsshim/internal/vmcompute
 github.com/Microsoft/hcsshim/internal/wclayer
 github.com/Microsoft/hcsshim/internal/winapi
 github.com/Microsoft/hcsshim/osversion
-# github.com/VividCortex/ewma v1.2.0
-## explicit; go 1.12
-github.com/VividCortex/ewma
-# github.com/avarteqgmbh/rvm-cnb v0.1.15
-## explicit; go 1.15
+# github.com/avarteqgmbh/rvm-cnb v0.1.18
+## explicit; go 1.18
 github.com/avarteqgmbh/rvm-cnb/rvm
 github.com/avarteqgmbh/rvm-cnb/rvm/fakes
 # github.com/cenkalti/backoff/v4 v4.1.3
 ## explicit; go 1.13
 github.com/cenkalti/backoff/v4
-# github.com/cheggaaa/pb/v3 v3.0.8
-## explicit; go 1.12
-github.com/cheggaaa/pb/v3
-github.com/cheggaaa/pb/v3/termutil
 # github.com/containerd/cgroups v1.0.4
 ## explicit; go 1.17
 github.com/containerd/cgroups/stats/v1
@@ -107,9 +100,6 @@ github.com/docker/go-connections/tlsconfig
 # github.com/docker/go-units v0.4.0
 ## explicit
 github.com/docker/go-units
-# github.com/fatih/color v1.13.0
-## explicit; go 1.13
-github.com/fatih/color
 # github.com/gabriel-vasile/mimetype v1.4.0
 ## explicit; go 1.12
 github.com/gabriel-vasile/mimetype
@@ -137,15 +127,6 @@ github.com/google/uuid
 # github.com/magiconair/properties v1.8.6
 ## explicit; go 1.13
 github.com/magiconair/properties
-# github.com/mattn/go-colorable v0.1.12
-## explicit; go 1.13
-github.com/mattn/go-colorable
-# github.com/mattn/go-isatty v0.0.14
-## explicit; go 1.12
-github.com/mattn/go-isatty
-# github.com/mattn/go-runewidth v0.0.13
-## explicit; go 1.9
-github.com/mattn/go-runewidth
 # github.com/moby/sys/mount v0.3.2
 ## explicit; go 1.16
 github.com/moby/sys/mount
@@ -189,22 +170,19 @@ github.com/opencontainers/runc/libcontainer/user
 github.com/paketo-buildpacks/occam
 github.com/paketo-buildpacks/occam/matchers
 github.com/paketo-buildpacks/occam/packagers
-# github.com/paketo-buildpacks/packit v1.3.1
-## explicit; go 1.16
-github.com/paketo-buildpacks/packit
-github.com/paketo-buildpacks/packit/cargo
-github.com/paketo-buildpacks/packit/chronos
-github.com/paketo-buildpacks/packit/fs
-github.com/paketo-buildpacks/packit/internal
-github.com/paketo-buildpacks/packit/postal
-github.com/paketo-buildpacks/packit/postal/internal
-github.com/paketo-buildpacks/packit/scribe
-github.com/paketo-buildpacks/packit/servicebindings
-github.com/paketo-buildpacks/packit/vacation
 # github.com/paketo-buildpacks/packit/v2 v2.3.0
 ## explicit; go 1.16
+github.com/paketo-buildpacks/packit/v2
+github.com/paketo-buildpacks/packit/v2/cargo
+github.com/paketo-buildpacks/packit/v2/chronos
 github.com/paketo-buildpacks/packit/v2/fs
+github.com/paketo-buildpacks/packit/v2/internal
+github.com/paketo-buildpacks/packit/v2/paketosbom
 github.com/paketo-buildpacks/packit/v2/pexec
+github.com/paketo-buildpacks/packit/v2/postal
+github.com/paketo-buildpacks/packit/v2/postal/internal
+github.com/paketo-buildpacks/packit/v2/scribe
+github.com/paketo-buildpacks/packit/v2/servicebindings
 github.com/paketo-buildpacks/packit/v2/vacation
 # github.com/pelletier/go-toml v1.9.5
 ## explicit; go 1.12
@@ -212,9 +190,6 @@ github.com/pelletier/go-toml
 # github.com/pkg/errors v0.9.1
 ## explicit
 github.com/pkg/errors
-# github.com/rivo/uniseg v0.2.0
-## explicit; go 1.12
-github.com/rivo/uniseg
 # github.com/sclevine/spec v1.4.0
 ## explicit; go 1.13
 github.com/sclevine/spec
@@ -271,7 +246,7 @@ golang.org/x/text/internal/utf8internal
 golang.org/x/text/language
 golang.org/x/text/runes
 golang.org/x/text/transform
-# google.golang.org/genproto v0.0.0-20220526192754-51939a95c655
+# google.golang.org/genproto v0.0.0-20220527130721-00d5c0f3be58
 ## explicit; go 1.15
 google.golang.org/genproto/googleapis/rpc/status
 # google.golang.org/grpc v1.46.2
@@ -314,6 +289,6 @@ google.golang.org/protobuf/types/known/timestamppb
 # gopkg.in/yaml.v2 v2.4.0
 ## explicit; go 1.15
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0
+# gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3

@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/paketo-buildpacks/packit"
+	"github.com/paketo-buildpacks/packit/v2"
 )
 
 // Env represents an RVM environment
@@ -124,16 +124,19 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 		return packit.BuildResult{}, err
 	}
 
+	var buildMetadata packit.BuildMetadata
+	var launchMetadata packit.LaunchMetadata
+
 	if rvmLayer.Metadata["rvm_version"] != nil &&
 		rvmLayer.Metadata["rvm_version"].(string) == r.rvmVersion() &&
 		rvmLayer.Metadata["ruby_version"] != nil &&
 		rvmLayer.Metadata["ruby_version"].(string) == r.rubyVersion() {
 		r.Logger.Process("Reusing cached layer %s", rvmLayer.Path)
+		rvmLayer.Build, rvmLayer.Cache, rvmLayer.Launch = true, true, true
 		return packit.BuildResult{
-			Plan: r.Context.Plan,
-			Layers: []packit.Layer{
-				rvmLayer,
-			},
+			Layers: []packit.Layer{rvmLayer},
+			Build:  buildMetadata,
+			Launch: launchMetadata,
 		}, nil
 	}
 
@@ -149,9 +152,7 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 		"ruby_version": r.rubyVersion(),
 	}
 
-	rvmLayer.Build = true
-	rvmLayer.Cache = true
-	rvmLayer.Launch = true
+	rvmLayer.Build, rvmLayer.Cache, rvmLayer.Launch = true, true, true
 
 	err = r.Environment.Configure(rvmLayer.SharedEnv, rvmLayer.Path)
 	if err != nil {
@@ -242,9 +243,8 @@ func (r Env) installRVM() (packit.BuildResult, error) {
 	}
 
 	return packit.BuildResult{
-		Plan: r.Context.Plan,
-		Layers: []packit.Layer{
-			rvmLayer,
-		},
+		Layers: []packit.Layer{rvmLayer},
+		Build:  buildMetadata,
+		Launch: launchMetadata,
 	}, nil
 }

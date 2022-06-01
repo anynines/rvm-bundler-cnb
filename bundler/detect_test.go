@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/paketo-buildpacks/packit"
+	"github.com/paketo-buildpacks/packit/v2"
 
 	"github.com/avarteqgmbh/rvm-bundler-cnb/bundler"
 	"github.com/avarteqgmbh/rvm-cnb/rvm"
@@ -34,8 +34,8 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		bundlerVersionParser = &fakes.VersionParser{}
 		buildpackYMLParser = &fakes.VersionParser{}
 
-		logEmitter := rvm.NewLogEmitter(os.Stdout)
-		detect = bundler.Detect(logEmitter, bundlerVersionParser, buildpackYMLParser)
+		logger := rvm.NewLogEmitter(os.Stdout)
+		detect = bundler.Detect(logger, bundlerVersionParser, buildpackYMLParser)
 	})
 
 	it("returns a plan that does not provide RVM bundler because no Gemfile was found", func() {

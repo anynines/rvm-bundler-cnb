@@ -3,7 +3,7 @@ package rvm
 import (
 	"io"
 
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/paketo-buildpacks/packit/v2/scribe"
 )
 
 // LogEmitter allows to write logs using the packing lib

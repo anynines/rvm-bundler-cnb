@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/paketo-buildpacks/packit"
-	"github.com/paketo-buildpacks/packit/scribe"
+	"github.com/paketo-buildpacks/packit/v2"
+	"github.com/paketo-buildpacks/packit/v2/scribe"
 )
 
 // PumaGemInstaller represents a new puma gem installer
@@ -112,6 +112,7 @@ func (p PumaGemInstaller) CreatePumaProcess(context packit.BuildContext, configu
 		return packit.Process{
 			Type:    "web",
 			Command: "bundle exec puma",
+			Default: true,
 		}, nil
 	}
 

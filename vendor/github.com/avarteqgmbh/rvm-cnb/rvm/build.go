@@ -3,7 +3,7 @@ package rvm
 import (
 	"path/filepath"
 
-	"github.com/paketo-buildpacks/packit"
+	"github.com/paketo-buildpacks/packit/v2"
 )
 
 // EnvironmentConfiguration represents an environment and a path to the RVM
