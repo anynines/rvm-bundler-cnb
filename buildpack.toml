@@ -10,13 +10,13 @@ api = "0.8"
   pre-package = "./scripts/build.sh"
 
   [metadata.configuration]
-    default_bundler_version = "2.2.24"
+    default_bundler_version = "2.3.14"
 
     install_puma = true
     [metadata.configuration.puma]
-      version = "4.3.8"
+      version = "4.3.12"
       bind = "tcp://0.0.0.0:8080"
-      workers = "5"
+      workers = "2"
       threads = "5"
       preload = true
 
