@@ -76,7 +76,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	rubyMajorVersion, err := strconf.Atoi(strings.Split(rubyVersion, ".")[0])
+	rubyMajorVersion, err := strconv.Atoi(strings.Split(rubyVersion, ".")[0])
 	if err != nil {
 		logger.Process("Failed to determine Ruby major version")
 		return packit.BuildResult{}, err
