@@ -76,6 +76,12 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
+	rubyMajorVersion, err := strconf.Atoi(strings.Split(rubyVersion, ".")[0])
+	if err != nil {
+		logger.Process("Failed to determine Ruby major version")
+		return packit.BuildResult{}, err
+	}
+
 	localConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config")
 	backupConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config.bak")
 	globalConfigPath := filepath.Join(bundlerLayer.Path, "config")
@@ -118,6 +124,8 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		rubyGemsVersion := ""
 		if bundlerMajorVersion == 1 {
 			rubyGemsVersion = "3.0.8"
+		} else if rubyMajorVersion < 3 {
+			rubyGemsVersion = "3.4.22"
 		}
 
 		installRubyGemsUpdateSystemCmd := strings.Join([]string{
