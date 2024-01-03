@@ -113,7 +113,7 @@ func testLayerReuse(t *testing.T, context spec.G, it spec.S) {
 
 			Expect(logs).To(ContainLines(
 				MatchRegexp(fmt.Sprintf(`%s \d+\.\d+\.\d+`, settings.Buildpack.Name)),
-				"  default Bundler version: 2.1.4",
+				"  default Bundler version: 2.3.14",
 			))
 
 			Expect(logs).To(ContainLines(

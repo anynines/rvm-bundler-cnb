@@ -1,8 +1,11 @@
 package bundler
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -76,6 +79,11 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
+	rubyMajorVersion, rubyMinorVersion, err := extractRubyVersion(rubyVersion)
+	if err != nil {
+		return packit.BuildResult{}, err
+	}
+
 	localConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config")
 	backupConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config.bak")
 	globalConfigPath := filepath.Join(bundlerLayer.Path, "config")
@@ -116,9 +124,16 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		logger.Process("Installing Bundler version '%s'", bundlerVersion(context, configuration))
 
 		rubyGemsVersion := ""
+		rubyMajorCheck := "2"
+		rubyMinorCheck := []string{"6", "7"}
 		if bundlerMajorVersion == 1 {
 			rubyGemsVersion = "3.0.8"
+		} else if rubyMajorVersion == rubyMajorCheck && slices.Contains(rubyMinorCheck, rubyMinorVersion) {
+			// ruby gems 3.4.22 is the latest with Ruby 2.6 and 2.7 support
+			rubyGemsVersion = "3.4.22"
 		}
+
+		logger.Process("rubygems-update version explicitly set to '%s'", rubyGemsVersion)
 
 		installRubyGemsUpdateSystemCmd := strings.Join([]string{
 			"gem",
@@ -310,4 +325,20 @@ func ShouldRun(metadata map[string]interface{}, workingDir string, versionResolv
 	shouldRun := !cacheMatch || !rubyVersionMatch
 
 	return shouldRun, sum, rubyVersion, nil
+}
+
+// Extracts major ruby version from a substring like "ruby-1.2.3" or "ruby-head" from "^ruby" and "^jruby" strings
+// Returns major + minor versions OR "head" + "" and an error.
+func extractRubyVersion(version string) (string, string, error) {
+	re := regexp.MustCompile(`ruby-(\d+)\.(\d+)`)
+	matches := re.FindStringSubmatch(version)
+
+	if len(matches) < 2 {
+		if strings.Contains(version, "ruby-head") {
+			return "head", "", nil
+		}
+		return "", "", fmt.Errorf("unable to extract Ruby version from: %s", version)
+	}
+
+	return matches[1], matches[2], nil
 }
