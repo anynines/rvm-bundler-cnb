@@ -136,6 +136,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		if bundlerMajorVersion == 1 {
 			rubyGemsVersion = "3.0.8"
 		} else if rubyVersionMap["major"] == 2 && rubyVersionMap["minor"] >= 6 {
+			// install rubyGems < 3.5, because higher versions require Ruby 3+
 			rubyGemsVersion = "3.4.22"
 		}
 
