@@ -29,11 +29,32 @@ type Transport interface {
 	Drop(root, uri string) (io.ReadCloser, error)
 }
 
-//go:generate faux --interface MappingResolver --output fakes/mapping_resolver.go
 // MappingResolver serves as the interface that looks up platform binding provided
 // dependency mappings given a SHA256
+//
+//go:generate faux --interface MappingResolver --output fakes/mapping_resolver.go
 type MappingResolver interface {
-	FindDependencyMapping(SHA256, platformDir string) (string, error)
+	FindDependencyMapping(checksum, platformDir string) (string, error)
+}
+
+// ErrNoDeps is a typed error indicating that no dependencies were resolved during Service.Resolve()
+//
+// errors can be tested against this type with: errors.As()
+type ErrNoDeps struct {
+	id                string
+	version           string
+	stack             string
+	supportedVersions []string
+}
+
+// Error implements the error.Error interface
+func (e *ErrNoDeps) Error() string {
+	return fmt.Sprintf("failed to satisfy %q dependency version constraint %q: no compatible versions on %q stack. Supported versions are: [%s]",
+		e.id,
+		e.version,
+		e.stack,
+		strings.Join(e.supportedVersions, ", "),
+	)
 }
 
 // Service provides a mechanism for resolving and installing dependencies given
@@ -122,22 +143,85 @@ func (s Service) Resolve(path, id, version, stack string) (Dependency, error) {
 	}
 
 	if len(compatibleVersions) == 0 {
-		return Dependency{}, fmt.Errorf(
-			"failed to satisfy %q dependency version constraint %q: no compatible versions on %q stack. Supported versions are: [%s]",
-			id,
-			version,
-			stack,
-			strings.Join(supportedVersions, ", "),
-		)
+		return Dependency{}, &ErrNoDeps{id, version, stack, supportedVersions}
+	}
+
+	stacksForVersion := map[string][]string{}
+
+	for _, dep := range compatibleVersions {
+		stacksForVersion[dep.Version] = append(stacksForVersion[dep.Version], dep.Stacks...)
+	}
+
+	for version, stacks := range stacksForVersion {
+		count := stringSliceElementCount(stacks, "*")
+		if count > 1 {
+			return Dependency{}, fmt.Errorf("multiple dependencies support wildcard stack for version: %q", version)
+		}
 	}
 
 	sort.Slice(compatibleVersions, func(i, j int) bool {
-		iVersion := semver.MustParse(compatibleVersions[i].Version)
-		jVersion := semver.MustParse(compatibleVersions[j].Version)
-		return iVersion.GreaterThan(jVersion)
+		iDep := compatibleVersions[i]
+		jDep := compatibleVersions[j]
+
+		jVersion := semver.MustParse(jDep.Version)
+		iVersion := semver.MustParse(iDep.Version)
+
+		if !iVersion.Equal(jVersion) {
+			return iVersion.GreaterThan(jVersion)
+		}
+
+		iStacks := iDep.Stacks
+		jStacks := jDep.Stacks
+
+		// If either dependency supports the wildcard stack, it has lower
+		// priority than a dependency that only supports a more specific stack.
+		// This is true regardless of whether or not the dependency with
+		// wildcard stack support also supports other stacks
+		//
+		// If is an error to have multiple dependencies with the same version
+		// and wildcard stack support.
+		// This is tested for above, and we would not enter this sort function
+		// in this case
+
+		if stringSliceContains(iStacks, "*") {
+			return false
+		}
+
+		if stringSliceContains(jStacks, "*") {
+			return true
+		}
+
+		// As mentioned above, this isn't a valid path to encounter because
+		// only one dependency may have support for wildcard stacks for a given
+		// version. We could panic, but it is preferable to return an invalid
+		// sort order instead.
+		//
+		// This is untested as this path is not possible to encounter.
+		return true
 	})
 
 	return compatibleVersions[0], nil
+}
+
+func stringSliceContains(slice []string, str string) bool {
+	for _, s := range slice {
+		if s == str {
+			return true
+		}
+	}
+
+	return false
+}
+
+func stringSliceElementCount(slice []string, str string) int {
+	count := 0
+	for _, s := range slice {
+		if s == str {
+			count++
+		}
+	}
+
+	return count
 }
 
 // Deliver will fetch and expand a dependency into a layer path location. The
@@ -148,7 +232,12 @@ func (s Service) Resolve(path, id, version, stack string) (Dependency, error) {
 // validated against the checksum value provided on the Dependency and will
 // error if there are inconsistencies in the fetched result.
 func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath string) error {
-	dependencyMappingURI, err := s.mappingResolver.FindDependencyMapping(dependency.SHA256, platformPath)
+	dependencyChecksum := dependency.Checksum
+	if dependency.SHA256 != "" {
+		dependencyChecksum = fmt.Sprintf("sha256:%s", dependency.SHA256)
+	}
+
+	dependencyMappingURI, err := s.mappingResolver.FindDependencyMapping(dependencyChecksum, platformPath)
 	if err != nil {
 		return fmt.Errorf("failure checking for dependency mappings: %s", err)
 	}
@@ -163,7 +252,7 @@ func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath
 	}
 	defer bundle.Close()
 
-	validatedReader := cargo.NewValidatedReader(bundle, dependency.SHA256)
+	validatedReader := cargo.NewValidatedReader(bundle, dependencyChecksum)
 
 	name := dependency.Name
 	if name == "" {
@@ -193,17 +282,44 @@ func (s Service) Deliver(dependency Dependency, cnbPath, layerPath, platformPath
 func (s Service) GenerateBillOfMaterials(dependencies ...Dependency) []packit.BOMEntry {
 	var entries []packit.BOMEntry
 	for _, dependency := range dependencies {
+
+		checksum := Checksum(dependency.SHA256)
+		if len(dependency.Checksum) > 0 {
+			checksum = Checksum(dependency.Checksum)
+		}
+
+		hash := checksum.Hash()
+		paketoSbomAlgorithm, err := paketosbom.GetBOMChecksumAlgorithm(checksum.Algorithm())
+		// GetBOMChecksumAlgorithm will set algorithm to UNKNOWN if there is an error
+		if err != nil || hash == "" {
+			paketoSbomAlgorithm = paketosbom.UNKNOWN
+			hash = ""
+		}
+
+		sourceChecksum := Checksum(dependency.SourceSHA256)
+		if len(dependency.Checksum) > 0 {
+			sourceChecksum = Checksum(dependency.SourceChecksum)
+		}
+
+		sourceHash := sourceChecksum.Hash()
+		paketoSbomSrcAlgorithm, err := paketosbom.GetBOMChecksumAlgorithm(sourceChecksum.Algorithm())
+		// GetBOMChecksumAlgorithm will set algorithm to UNKNOWN if there is an error
+		if err != nil || sourceHash == "" {
+			paketoSbomSrcAlgorithm = paketosbom.UNKNOWN
+			sourceHash = ""
+		}
+
 		paketoBomMetadata := paketosbom.BOMMetadata{
 			Checksum: paketosbom.BOMChecksum{
-				Algorithm: paketosbom.SHA256,
-				Hash:      dependency.SHA256,
+				Algorithm: paketoSbomAlgorithm,
+				Hash:      hash,
 			},
 			URI:     dependency.URI,
 			Version: dependency.Version,
 			Source: paketosbom.BOMSource{
 				Checksum: paketosbom.BOMChecksum{
-					Algorithm: paketosbom.SHA256,
-					Hash:      dependency.SourceSHA256,
+					Algorithm: paketoSbomSrcAlgorithm,
+					Hash:      sourceHash,
 				},
 				URI: dependency.Source,
 			},

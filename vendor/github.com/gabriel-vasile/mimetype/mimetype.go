@@ -39,7 +39,8 @@ func Detect(in []byte) *MIME {
 //
 // DetectReader assumes the reader offset is at the start. If the input is an
 // io.ReadSeeker you previously read from, it should be rewinded before detection:
-//  reader.Seek(0, io.SeekStart)
+//
+//	reader.Seek(0, io.SeekStart)
 func DetectReader(r io.Reader) (*MIME, error) {
 	var in []byte
 	var err error
@@ -52,7 +53,7 @@ func DetectReader(r io.Reader) (*MIME, error) {
 			return errMIME, err
 		}
 	} else {
-		n := 0
+		var n int
 		in = make([]byte, l)
 		// io.UnexpectedEOF means len(r) < len(in). It is not an error in this case,
 		// it just means the input file is smaller than the allocated bytes slice.

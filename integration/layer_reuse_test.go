@@ -2,7 +2,6 @@ package integration
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -179,10 +178,10 @@ func testLayerReuse(t *testing.T, context spec.G, it spec.S) {
 
 				Eventually(firstContainer).Should(BeAvailable())
 
-				contents, err := ioutil.ReadFile(filepath.Join(source, "Gemfile.lock"))
+				contents, err := os.ReadFile(filepath.Join(source, "Gemfile.lock"))
 				Expect(err).NotTo(HaveOccurred())
 
-				err = ioutil.WriteFile(filepath.Join(source, "Gemfile.lock"),
+				err = os.WriteFile(filepath.Join(source, "Gemfile.lock"),
 					[]byte(string(contents)+"\n"), 0600)
 				Expect(err).NotTo(HaveOccurred())
 
@@ -258,10 +257,10 @@ func testLayerReuse(t *testing.T, context spec.G, it spec.S) {
 
 				Eventually(firstContainer).Should(BeAvailable())
 
-				contents, err := ioutil.ReadFile(filepath.Join(source, "Gemfile"))
+				contents, err := os.ReadFile(filepath.Join(source, "Gemfile"))
 				Expect(err).NotTo(HaveOccurred())
 
-				err = ioutil.WriteFile(filepath.Join(source, "Gemfile"),
+				err = os.WriteFile(filepath.Join(source, "Gemfile"),
 					[]byte(strings.ReplaceAll(string(contents),
 						`gem 'sinatra', '~>2.1.0'`,
 						`gem 'sinatra', '~>2.0.8'`,

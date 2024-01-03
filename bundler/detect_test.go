@@ -1,7 +1,6 @@
 package bundler_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -49,25 +48,25 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 	context("when the app presents a Gemfile", func() {
 		it.Before(func() {
 			var err error
-			cnbDir, err = ioutil.TempDir("", "cnb")
+			cnbDir, err = os.MkdirTemp("", "cnb")
 			Expect(err).NotTo(HaveOccurred())
 
-			cnbErrDir, err = ioutil.TempDir("", "cnb")
+			cnbErrDir, err = os.MkdirTemp("", "cnb")
 			Expect(err).NotTo(HaveOccurred())
 
-			someBuildPackTomlFile, err := ioutil.ReadFile("../test/fixtures/some_buildpack.toml")
+			someBuildPackTomlFile, err := os.ReadFile("../test/fixtures/some_buildpack.toml")
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
+			err = os.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
-			workingDir, err = ioutil.TempDir("", "working-dir")
+			workingDir, err = os.MkdirTemp("", "working-dir")
 			Expect(err).NotTo(HaveOccurred())
 
-			gemFile, err := ioutil.ReadFile("../test/fixtures/Gemfile")
+			gemFile, err := os.ReadFile("../test/fixtures/Gemfile")
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(workingDir, "Gemfile"), gemFile, 0644)
+			err = os.WriteFile(filepath.Join(workingDir, "Gemfile"), gemFile, 0644)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -102,11 +101,11 @@ func testDetect(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("returns a plan that provides RVM, requires node and determines the ruby version by reading Gemfile.lock", func() {
-			gemfileLock, err := ioutil.ReadFile("../test/fixtures/Gemfile.lock")
+			gemfileLock, err := os.ReadFile("../test/fixtures/Gemfile.lock")
 			Expect(err).NotTo(HaveOccurred())
 
 			gemFileLockPath := filepath.Join(workingDir, "Gemfile.lock")
-			err = ioutil.WriteFile(gemFileLockPath, gemfileLock, 0644)
+			err = os.WriteFile(gemFileLockPath, gemfileLock, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			bundlerVersionParser.ParseVersionCall.Receives.Path = gemFileLockPath

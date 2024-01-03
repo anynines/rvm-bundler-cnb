@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/paketo-buildpacks/packit/v2/fs"
 	"github.com/paketo-buildpacks/packit/v2/pexec"
 )
 
@@ -32,9 +33,20 @@ func (j Jam) WithExecutable(executable Executable) Jam {
 }
 
 func (j Jam) Execute(buildpackDir, output, version string, offline bool) error {
+
+	extensionTomlPath := filepath.Join(buildpackDir, "extension.toml")
+
+	buildpackOrExtensionToml := "buildpack.toml"
+	command := "--buildpack"
+
+	if fileExists, err := fs.Exists(extensionTomlPath); fileExists && err == nil {
+		buildpackOrExtensionToml = "extension.toml"
+		command = "--extension"
+	}
+
 	args := []string{
 		"pack",
-		"--buildpack", filepath.Join(buildpackDir, "buildpack.toml"),
+		command, filepath.Join(buildpackDir, buildpackOrExtensionToml),
 		"--output", output,
 		"--version", version,
 	}

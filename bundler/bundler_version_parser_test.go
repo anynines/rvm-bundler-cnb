@@ -1,7 +1,6 @@
 package bundler_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -24,14 +23,14 @@ func testBundlerVersionParser(t *testing.T, context spec.G, it spec.S) {
 		it.Before(func() {
 			var err error
 
-			workingDir, err = ioutil.TempDir("", "workingDir")
+			workingDir, err = os.MkdirTemp("", "workingDir")
 			Expect(err).NotTo(HaveOccurred())
 
-			gemfileLock, err := ioutil.ReadFile("../test/fixtures/Gemfile.lock")
+			gemfileLock, err := os.ReadFile("../test/fixtures/Gemfile.lock")
 			Expect(err).NotTo(HaveOccurred())
 
 			gemFileLockPath := filepath.Join(workingDir, "Gemfile.lock")
-			err = ioutil.WriteFile(gemFileLockPath, gemfileLock, 0644)
+			err = os.WriteFile(gemFileLockPath, gemfileLock, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			bundlerVersionParser = bundler.NewBundlerVersionParser()
@@ -57,7 +56,7 @@ func testBundlerVersionParser(t *testing.T, context spec.G, it spec.S) {
 		it.Before(func() {
 			var err error
 
-			workingDir, err = ioutil.TempDir("", "workingDir")
+			workingDir, err = os.MkdirTemp("", "workingDir")
 			Expect(err).NotTo(HaveOccurred())
 
 			gemFileLockPath := filepath.Join(workingDir, "Gemfile.lock")

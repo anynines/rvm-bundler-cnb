@@ -2,7 +2,17 @@ package testcontainers
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
+
+	"github.com/testcontainers/testcontainers-go/internal/testcontainersdocker"
+	"github.com/testcontainers/testcontainers-go/internal/testcontainerssession"
+)
+
+var (
+	reuseContainerMx  sync.Mutex
+	ErrReuseEmptyName = errors.New("with reuse option a container name mustn't be empty")
 )
 
 // GenericContainerRequest represents parameters to a generic container
@@ -11,14 +21,17 @@ type GenericContainerRequest struct {
 	Started          bool         // whether to auto-start the container
 	ProviderType     ProviderType // which provider to use, Docker if empty
 	Logger           Logging      // provide a container specific Logging - use default global logger if empty
+	Reuse            bool         // reuse an existing container if it exists or create a new one. a container name mustn't be empty
 }
 
+// Deprecated: will be removed in the future.
 // GenericNetworkRequest represents parameters to a generic network
 type GenericNetworkRequest struct {
 	NetworkRequest              // embedded request for provider
 	ProviderType   ProviderType // which provider to use, Docker if empty
 }
 
+// Deprecated: use network.New instead
 // GenericNetwork creates a generic network with parameters
 func GenericNetwork(ctx context.Context, req GenericNetworkRequest) (Network, error) {
 	provider, err := req.ProviderType.GetProvider()
@@ -35,6 +48,10 @@ func GenericNetwork(ctx context.Context, req GenericNetworkRequest) (Network, er
 
 // GenericContainer creates a generic container with parameters
 func GenericContainer(ctx context.Context, req GenericContainerRequest) (Container, error) {
+	if req.Reuse && req.Name == "" {
+		return nil, ErrReuseEmptyName
+	}
+
 	logging := req.Logger
 	if logging == nil {
 		logging = Logger
@@ -43,18 +60,28 @@ func GenericContainer(ctx context.Context, req GenericContainerRequest) (Contain
 	if err != nil {
 		return nil, err
 	}
+	defer provider.Close()
 
-	c, err := provider.CreateContainer(ctx, req.ContainerRequest)
+	var c Container
+	if req.Reuse {
+		// we must protect the reusability of the container in the case it's invoked
+		// in a parallel execution, via ParallelContainers or t.Parallel()
+		reuseContainerMx.Lock()
+		defer reuseContainerMx.Unlock()
+
+		c, err = provider.ReuseOrCreateContainer(ctx, req.ContainerRequest)
+	} else {
+		c, err = provider.CreateContainer(ctx, req.ContainerRequest)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("%w: failed to create container", err)
 	}
 
-	if req.Started {
+	if req.Started && !c.IsRunning() {
 		if err := c.Start(ctx); err != nil {
 			return c, fmt.Errorf("%w: failed to start container", err)
 		}
 	}
-
 	return c, nil
 }
 
@@ -62,4 +89,10 @@ func GenericContainer(ctx context.Context, req GenericContainerRequest) (Contain
 type GenericProvider interface {
 	ContainerProvider
 	NetworkProvider
+	ImageProvider
+}
+
+// GenericLabels returns a map of labels that can be used to identify containers created by this library
+func GenericLabels() map[string]string {
+	return testcontainersdocker.DefaultLabels(testcontainerssession.SessionID())
 }

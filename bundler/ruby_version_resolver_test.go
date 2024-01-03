@@ -2,7 +2,6 @@ package bundler_test
 
 import (
 	"errors"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -34,7 +33,7 @@ func testRubyVersionResolver(t *testing.T, context spec.G, it spec.S) {
 		it("Return result with ruby version", func() {
 			bashCmd.RunBashCmdCall.Returns.String = "ruby-2.0.0"
 
-			workingDir, err := ioutil.TempDir("", "working-dir")
+			workingDir, err := os.MkdirTemp("", "working-dir")
 			Expect(err).NotTo(HaveOccurred())
 
 			result, err := resolver.Lookup(workingDir, bashCmd)
@@ -46,7 +45,7 @@ func testRubyVersionResolver(t *testing.T, context spec.G, it spec.S) {
 		it("Return an error on no ruby found", func() {
 			bashCmd.RunBashCmdCall.Returns.String = "some text"
 
-			workingDir, err := ioutil.TempDir("", "working-dir")
+			workingDir, err := os.MkdirTemp("", "working-dir")
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = resolver.Lookup(workingDir, bashCmd)
@@ -59,7 +58,7 @@ func testRubyVersionResolver(t *testing.T, context spec.G, it spec.S) {
 		it("Return an error on bash exec failure", func() {
 			bashCmd.RunBashCmdCall.Returns.Error = errors.New("failed to execute bash command")
 
-			workingDir, err := ioutil.TempDir("", "working-dir")
+			workingDir, err := os.MkdirTemp("", "working-dir")
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = resolver.Lookup(workingDir, bashCmd)

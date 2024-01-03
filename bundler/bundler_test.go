@@ -3,7 +3,6 @@ package bundler_test
 import (
 	"bytes"
 	"errors"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -36,13 +35,13 @@ func testBundler(t *testing.T, context spec.G, it spec.S) {
 	it.Before(func() {
 		var err error
 
-		cnbDir, err = ioutil.TempDir("", "cnb")
+		cnbDir, err = os.MkdirTemp("", "cnb")
 		Expect(err).NotTo(HaveOccurred())
 
-		workingDir, err = ioutil.TempDir("", "working-dir")
+		workingDir, err = os.MkdirTemp("", "working-dir")
 		Expect(err).NotTo(HaveOccurred())
 
-		layersDir, err = ioutil.TempDir("", "layers")
+		layersDir, err = os.MkdirTemp("", "layers")
 		Expect(err).NotTo(HaveOccurred())
 
 		versionResolver = &fakes.VersionResolver{}
@@ -51,10 +50,10 @@ func testBundler(t *testing.T, context spec.G, it spec.S) {
 		pumainstaller = &fakes.PumaInstaller{}
 		emptyBuffer = []byte(``)
 
-		someBuildPackTomlFile, err := ioutil.ReadFile("../buildpack.toml")
+		someBuildPackTomlFile, err := os.ReadFile("../buildpack.toml")
 		Expect(err).NotTo(HaveOccurred())
 
-		err = ioutil.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
+		err = os.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
 		Expect(err).NotTo(HaveOccurred())
 	})
 
@@ -109,7 +108,7 @@ func testBundler(t *testing.T, context spec.G, it spec.S) {
 			err := os.MkdirAll(filepath.Join(workingDir, ".bundle"), 0700)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(workingDir, ".bundle", "config"), emptyBuffer, 0644)
+			err = os.WriteFile(filepath.Join(workingDir, ".bundle", "config"), emptyBuffer, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			ctx = packit.BuildContext{
@@ -139,10 +138,10 @@ func testBundler(t *testing.T, context spec.G, it spec.S) {
 			err := os.MkdirAll(filepath.Join(workingDir, ".bundle"), 0700)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(workingDir, ".bundle", "config"), emptyBuffer, 0644)
+			err = os.WriteFile(filepath.Join(workingDir, ".bundle", "config"), emptyBuffer, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(workingDir, ".bundle", "config.bak"), emptyBuffer, 0644)
+			err = os.WriteFile(filepath.Join(workingDir, ".bundle", "config.bak"), emptyBuffer, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			ctx = packit.BuildContext{

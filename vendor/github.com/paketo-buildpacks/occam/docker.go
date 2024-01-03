@@ -3,23 +3,38 @@ package occam
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
+	"github.com/docker/docker/client"
+	name "github.com/google/go-containerregistry/pkg/name"
+	v1 "github.com/google/go-containerregistry/pkg/v1"
+	daemon "github.com/google/go-containerregistry/pkg/v1/daemon"
 	"github.com/paketo-buildpacks/packit/v2/pexec"
 )
 
+//go:generate faux --interface DockerDaemonClient --output fakes/daemon_client.go
+type DockerDaemonClient interface {
+	daemon.Client
+}
+
 type Docker struct {
 	Image struct {
-		Inspect DockerImageInspect
-		Remove  DockerImageRemove
+		ExportToOCI DockerImageOCI
+		Inspect     DockerImageInspect
+		Remove      DockerImageRemove
+		Tag         DockerImageTag
 	}
 
 	Container struct {
+		Copy    DockerContainerCopy
+		Exec    DockerContainerExec
 		Inspect DockerContainerInspect
 		Logs    DockerContainerLogs
-		Run     DockerContainerRun
 		Remove  DockerContainerRemove
+		Restart DockerContainerRestart
+		Run     DockerContainerRun
 		Stop    DockerContainerStop
 	}
 
@@ -36,7 +51,11 @@ func NewDocker() Docker {
 
 	docker.Image.Inspect = DockerImageInspect{executable: executable}
 	docker.Image.Remove = DockerImageRemove{executable: executable}
+	docker.Image.Tag = DockerImageTag{executable: executable}
+	docker.Image.ExportToOCI = DockerImageOCI{}
 
+	docker.Container.Copy = DockerContainerCopy{executable: executable}
+	docker.Container.Exec = DockerContainerExec{executable: executable}
 	docker.Container.Inspect = DockerContainerInspect{executable: executable}
 	docker.Container.Logs = DockerContainerLogs{executable: executable}
 	docker.Container.Run = DockerContainerRun{
@@ -45,6 +64,7 @@ func NewDocker() Docker {
 	}
 
 	docker.Container.Remove = DockerContainerRemove{executable: executable}
+	docker.Container.Restart = DockerContainerRestart{executable: executable}
 	docker.Container.Stop = DockerContainerStop{executable: executable}
 
 	docker.Volume.Remove = DockerVolumeRemove{executable: executable}
@@ -57,9 +77,13 @@ func NewDocker() Docker {
 func (d Docker) WithExecutable(executable Executable) Docker {
 	d.Image.Inspect.executable = executable
 	d.Image.Remove.executable = executable
+	d.Image.Tag.executable = executable
 
+	d.Container.Copy.executable = executable
+	d.Container.Exec.executable = executable
 	d.Container.Inspect.executable = executable
 	d.Container.Logs.executable = executable
+	d.Container.Restart.executable = executable
 	d.Container.Remove.executable = executable
 	d.Container.Run.executable = executable
 	d.Container.Run.inspect = d.Container.Inspect
@@ -93,12 +117,24 @@ func (i DockerImageInspect) Execute(ref string) (Image, error) {
 
 type DockerImageRemove struct {
 	executable Executable
+	force      bool
+}
+
+func (r DockerImageRemove) WithForce() DockerImageRemove {
+	r.force = true
+	return r
 }
 
 func (r DockerImageRemove) Execute(ref string) error {
+	args := []string{"image", "remove", ref}
+
+	if r.force {
+		args = append(args, "--force")
+	}
+
 	stderr := bytes.NewBuffer(nil)
 	err := r.executable.Execute(pexec.Execution{
-		Args:   []string{"image", "remove", ref},
+		Args:   args,
 		Stderr: stderr,
 	})
 	if err != nil {
@@ -106,6 +142,55 @@ func (r DockerImageRemove) Execute(ref string) error {
 	}
 
 	return nil
+}
+
+type DockerImageTag struct {
+	executable Executable
+}
+
+func (r DockerImageTag) Execute(ref, target string) error {
+	stderr := bytes.NewBuffer(nil)
+	err := r.executable.Execute(pexec.Execution{
+		Args:   []string{"image", "tag", ref, target},
+		Stderr: stderr,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to tag docker image: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
+}
+
+type DockerImageOCI struct {
+	client      DockerDaemonClient
+	nameOptions []name.Option
+}
+
+func (r DockerImageOCI) WithNameOptions(opts ...name.Option) DockerImageOCI {
+	r.nameOptions = opts
+	return r
+}
+
+func (r DockerImageOCI) WithClient(client DockerDaemonClient) DockerImageOCI {
+	r.client = client
+	return r
+}
+
+func (r DockerImageOCI) Execute(ref string) (v1.Image, error) {
+	if r.client == nil {
+		client, err := client.NewClientWithOpts(client.FromEnv, client.WithAPIVersionNegotiation())
+		if err != nil {
+			return nil, err
+		}
+
+		r.client = client
+	}
+	nameRef, err := name.ParseReference(ref, r.nameOptions...)
+	if err != nil {
+		return nil, err
+	}
+
+	return daemon.Image(nameRef, daemon.WithClient(r.client))
 }
 
 type DockerContainerRun struct {
@@ -123,6 +208,8 @@ type DockerContainerRun struct {
 	publishPorts []string
 	tty          bool
 	volumes      []string
+	readOnly     bool
+	mounts       []string
 }
 
 func (r DockerContainerRun) WithEnv(env map[string]string) DockerContainerRun {
@@ -186,6 +273,16 @@ func (r DockerContainerRun) WithNetwork(network string) DockerContainerRun {
 	return r
 }
 
+func (r DockerContainerRun) WithReadOnly() DockerContainerRun {
+	r.readOnly = true
+	return r
+}
+
+func (r DockerContainerRun) WithMounts(mounts ...string) DockerContainerRun {
+	r.mounts = append(r.mounts, mounts...)
+	return r
+}
+
 func (r DockerContainerRun) Execute(imageID string) (Container, error) {
 	args := []string{"container", "run", "--detach"}
 
@@ -232,6 +329,14 @@ func (r DockerContainerRun) Execute(imageID string) (Container, error) {
 		args = append(args, "--volume", volume)
 	}
 
+	if r.readOnly {
+		args = append(args, "--read-only")
+	}
+
+	for _, mount := range r.mounts {
+		args = append(args, "--mount", mount)
+	}
+
 	args = append(args, imageID)
 
 	if r.direct {
@@ -255,6 +360,23 @@ func (r DockerContainerRun) Execute(imageID string) (Container, error) {
 	}
 
 	return r.inspect.Execute(strings.TrimSpace(stdout.String()))
+}
+
+type DockerContainerRestart struct {
+	executable Executable
+}
+
+func (r DockerContainerRestart) Execute(containerID string) error {
+	stderr := bytes.NewBuffer(nil)
+	err := r.executable.Execute(pexec.Execution{
+		Args:   []string{"container", "restart", containerID},
+		Stderr: stderr,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to restart docker container: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
 }
 
 type DockerContainerRemove struct {
@@ -332,6 +454,73 @@ func (s DockerContainerStop) Execute(containerID string) error {
 	}
 
 	return nil
+}
+
+type DockerContainerCopy struct {
+	executable Executable
+}
+
+func (docker DockerContainerCopy) Execute(source, dest string) error {
+	stderr := bytes.NewBuffer(nil)
+	err := docker.executable.Execute(pexec.Execution{
+		Args:   []string{"container", "cp", source, dest},
+		Stderr: stderr,
+	})
+	if err != nil {
+		return fmt.Errorf("'docker cp' failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
+}
+
+type DockerContainerExec struct {
+	executable  Executable
+	stdin       io.Reader
+	user        string
+	interactive bool
+}
+
+func (e DockerContainerExec) WithStdin(stdin io.Reader) DockerContainerExec {
+	e.stdin = stdin
+	return e
+}
+
+func (e DockerContainerExec) WithUser(user string) DockerContainerExec {
+	e.user = user
+	return e
+}
+
+func (e DockerContainerExec) WithInteractive() DockerContainerExec {
+	e.interactive = true
+	return e
+}
+
+func (e DockerContainerExec) Execute(container string, arguments ...string) error {
+	args := []string{"container", "exec"}
+	if e.interactive {
+		args = append(args, "--interactive")
+	}
+	if e.user != "" {
+		args = append(args, "--user", e.user)
+	}
+	args = append(args, container)
+	args = append(args, arguments...)
+
+	stderr := bytes.NewBuffer(nil)
+	err := e.executable.Execute(pexec.Execution{
+		Args:   args,
+		Stderr: stderr,
+		Stdin:  e.stdin,
+	})
+	if err != nil {
+		return fmt.Errorf("'docker exec' failed: %w: %s", err, strings.TrimSpace(stderr.String()))
+	}
+
+	return nil
+}
+
+func (e DockerContainerExec) ExecuteBash(container, script string) error {
+	return e.Execute(container, "/bin/bash", "-c", script)
 }
 
 type DockerVolumeRemove struct {

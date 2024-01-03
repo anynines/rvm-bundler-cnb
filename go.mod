@@ -1,55 +1,79 @@
 module github.com/avarteqgmbh/rvm-bundler-cnb
 
-go 1.18
+go 1.21
 
 require (
-	github.com/BurntSushi/toml v1.1.0
-	github.com/avarteqgmbh/rvm-cnb v0.1.18
-	github.com/onsi/gomega v1.19.0
-	github.com/paketo-buildpacks/occam v0.9.0
-	github.com/paketo-buildpacks/packit/v2 v2.3.0
+	github.com/BurntSushi/toml v1.3.2
+	github.com/avarteqgmbh/rvm-cnb v0.1.19
+	github.com/onsi/gomega v1.30.0
+	github.com/paketo-buildpacks/occam v0.18.0
+	github.com/paketo-buildpacks/packit/v2 v2.12.0
 	github.com/sclevine/spec v1.4.0
 	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
-	github.com/Azure/go-ansiterm v0.0.0-20210617225240-d185dfc1b5a1 // indirect
-	github.com/ForestEckhardt/freezer v0.0.11 // indirect
-	github.com/Masterminds/semver/v3 v3.1.1 // indirect
-	github.com/Microsoft/go-winio v0.5.2 // indirect
-	github.com/Microsoft/hcsshim v0.9.3 // indirect
-	github.com/cenkalti/backoff/v4 v4.1.3 // indirect
-	github.com/containerd/cgroups v1.0.4 // indirect
-	github.com/containerd/containerd v1.6.4 // indirect
-	github.com/docker/distribution v2.8.1+incompatible // indirect
-	github.com/docker/docker v20.10.16+incompatible // indirect
+	dario.cat/mergo v1.0.0 // indirect
+	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
+	github.com/ForestEckhardt/freezer v0.0.12 // indirect
+	github.com/Masterminds/semver/v3 v3.2.1 // indirect
+	github.com/Microsoft/go-winio v0.6.1 // indirect
+	github.com/Microsoft/hcsshim v0.11.4 // indirect
+	github.com/cenkalti/backoff/v4 v4.2.1 // indirect
+	github.com/containerd/cgroups v1.1.0 // indirect
+	github.com/containerd/containerd v1.7.11 // indirect
+	github.com/containerd/log v0.1.0 // indirect
+	github.com/containerd/stargz-snapshotter/estargz v0.15.1 // indirect
+	github.com/cpuguy83/dockercfg v0.3.1 // indirect
+	github.com/distribution/reference v0.5.0 // indirect
+	github.com/docker/distribution v2.8.3+incompatible // indirect
+	github.com/docker/docker v24.0.7+incompatible // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
-	github.com/docker/go-units v0.4.0 // indirect
-	github.com/gabriel-vasile/mimetype v1.4.0 // indirect
+	github.com/docker/go-units v0.5.0 // indirect
+	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
+	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/protobuf v1.5.2 // indirect
-	github.com/google/uuid v1.3.0 // indirect
-	github.com/magiconair/properties v1.8.6 // indirect
-	github.com/moby/sys/mount v0.3.2 // indirect
-	github.com/moby/sys/mountinfo v0.6.1 // indirect
-	github.com/moby/term v0.0.0-20210619224110-3f7ff695adc6 // indirect
+	github.com/golang/protobuf v1.5.3 // indirect
+	github.com/google/go-cmp v0.6.0 // indirect
+	github.com/google/go-containerregistry v0.17.0 // indirect
+	github.com/google/uuid v1.5.0 // indirect
+	github.com/klauspost/compress v1.17.4 // indirect
+	github.com/lufia/plan9stats v0.0.0-20231016141302-07b5767bb0ed // indirect
+	github.com/magiconair/properties v1.8.7 // indirect
+	github.com/moby/patternmatcher v0.6.0 // indirect
+	github.com/moby/sys/mount v0.3.3 // indirect
+	github.com/moby/sys/mountinfo v0.7.1 // indirect
+	github.com/moby/sys/sequential v0.5.0 // indirect
+	github.com/moby/term v0.5.0 // indirect
 	github.com/morikuni/aec v1.0.0 // indirect
 	github.com/oklog/ulid v1.3.1 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
-	github.com/opencontainers/image-spec v1.0.3-0.20220114050600-8b9d41f48198 // indirect
-	github.com/opencontainers/runc v1.1.2 // indirect
+	github.com/opencontainers/image-spec v1.1.0-rc5 // indirect
+	github.com/opencontainers/runc v1.1.11 // indirect
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
-	github.com/sirupsen/logrus v1.8.1 // indirect
-	github.com/testcontainers/testcontainers-go v0.13.0 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
-	go.opencensus.io v0.23.0 // indirect
-	golang.org/x/net v0.0.0-20220526153639-5463443f8c37 // indirect
-	golang.org/x/sys v0.0.0-20220520151302-bc2c85ada10a // indirect
-	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20220527130721-00d5c0f3be58 // indirect
-	google.golang.org/grpc v1.46.2 // indirect
-	google.golang.org/protobuf v1.28.0 // indirect
+	github.com/power-devops/perfstat v0.0.0-20221212215047-62379fc7944b // indirect
+	github.com/shirou/gopsutil/v3 v3.23.12 // indirect
+	github.com/shoenig/go-m1cpu v0.1.6 // indirect
+	github.com/sirupsen/logrus v1.9.3 // indirect
+	github.com/testcontainers/testcontainers-go v0.27.0 // indirect
+	github.com/tklauser/go-sysconf v0.3.13 // indirect
+	github.com/tklauser/numcpus v0.7.0 // indirect
+	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/vbatts/tar-split v0.11.5 // indirect
+	github.com/yusufpapurcu/wmi v1.2.3 // indirect
+	go.opencensus.io v0.24.0 // indirect
+	golang.org/x/exp v0.0.0-20231226003508-02704c960a9b // indirect
+	golang.org/x/mod v0.14.0 // indirect
+	golang.org/x/net v0.19.0 // indirect
+	golang.org/x/sync v0.5.0 // indirect
+	golang.org/x/sys v0.15.0 // indirect
+	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/tools v0.16.1 // indirect
+	google.golang.org/genproto v0.0.0-20231212172506-995d672761c0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240102182953-50ed04b92917 // indirect
+	google.golang.org/grpc v1.60.1 // indirect
+	google.golang.org/protobuf v1.32.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

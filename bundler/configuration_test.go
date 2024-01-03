@@ -1,7 +1,6 @@
 package bundler_test
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -23,7 +22,7 @@ func testConfiguration(t *testing.T, context spec.G, it spec.S) {
 	context("when the buildpack configuration is requested", func() {
 		it.Before(func() {
 			var err error
-			cnbDir, err = ioutil.TempDir("", "cnb")
+			cnbDir, err = os.MkdirTemp("", "cnb")
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -33,7 +32,7 @@ func testConfiguration(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("reads an invalid buildpack.toml file and returns an error", func() {
-			err := ioutil.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), []byte("[[buildpack]"), 0644)
+			err := os.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), []byte("[[buildpack]"), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			_, err = bundler.ReadConfiguration(cnbDir)
@@ -41,7 +40,7 @@ func testConfiguration(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("reads a valid buildpack.toml file without the [metadata.configuration] table and returns an empty configuration", func() {
-			err := ioutil.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), []byte("[buildpack]"), 0644)
+			err := os.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), []byte("[buildpack]"), 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			configuration, _ := bundler.ReadConfiguration(cnbDir)
@@ -49,10 +48,10 @@ func testConfiguration(t *testing.T, context spec.G, it spec.S) {
 		})
 
 		it("reads the buildpack.toml file and returns the configuration", func() {
-			someBuildPackTomlFile, err := ioutil.ReadFile(buildPackTomlPath)
+			someBuildPackTomlFile, err := os.ReadFile(buildPackTomlPath)
 			Expect(err).NotTo(HaveOccurred())
 
-			err = ioutil.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
+			err = os.WriteFile(filepath.Join(cnbDir, "buildpack.toml"), someBuildPackTomlFile, 0644)
 			Expect(err).NotTo(HaveOccurred())
 
 			configuration, err := bundler.ReadConfiguration(cnbDir)
