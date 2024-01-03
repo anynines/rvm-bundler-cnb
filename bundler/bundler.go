@@ -77,7 +77,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	rubyVersionMap := map[string]int{"major": -1, "minor": -1, "patch": -1}
+	rubyVersionMap := map[string]int{"major": -1, "minor": -1}
 
 	rubyVersionArr := regexp.MustCompile(`ruby-(\d+)\.(\d+)`).FindStringSubmatch(rubyVersion)
 	if len(rubyVersionArr) > 1 {
