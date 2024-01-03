@@ -77,11 +77,20 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		return packit.BuildResult{}, err
 	}
 
-	logger.Process("rubyVersion: %v\n", rubyVersion) //TODO: Remove Debug message
-	rubyMajorVersion, err := strconv.Atoi(regexp.MustCompile(`ruby-(\d+)\.`).FindStringSubmatch(rubyVersion)[1])
-	if err != nil {
-		logger.Process("Failed to determine Ruby major version")
-		return packit.BuildResult{}, err
+	rubyVersionMap := map[string]int{"major": -1, "minor": -1, "patch": -1}
+
+	rubyVersionArr := regexp.MustCompile(`ruby-(\d+)\.(\d+)`).FindStringSubmatch(rubyVersion)
+	if len(rubyVersionArr) > 1 {
+		rubyVersionMap["major"], err = strconv.Atoi(rubyVersionArr[1])
+		if err != nil {
+			logger.Process("Failed to determine Ruby Major version")
+			return packit.BuildResult{}, err
+		}
+		rubyVersionMap["minor"], err = strconv.Atoi(rubyVersionArr[2])
+		if err != nil {
+			logger.Process("Failed to determine Ruby Minor version")
+			return packit.BuildResult{}, err
+		}
 	}
 
 	localConfigPath := filepath.Join(context.WorkingDir, ".bundle", "config")
@@ -126,7 +135,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		rubyGemsVersion := ""
 		if bundlerMajorVersion == 1 {
 			rubyGemsVersion = "3.0.8"
-		} else if rubyMajorVersion < 3 {
+		} else if rubyVersionMap["major"] == 2 && rubyVersionMap["minor"] >= 6 {
 			rubyGemsVersion = "3.4.22"
 		}
 
