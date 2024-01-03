@@ -66,6 +66,7 @@ func testBundler(t *testing.T, context spec.G, it spec.S) {
 
 	context("InstallBunler", func() {
 		it.Before(func() {
+			versionResolver.LookupCall.Returns.Version = "ruby-3.3.0"
 			calculator.SumCall.Returns.String = "other-checksum"
 			Expect(os.WriteFile(filepath.Join(workingDir, "Gemfile.lock"), nil, 0600)).To(Succeed())
 		})

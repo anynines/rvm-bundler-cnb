@@ -90,6 +90,7 @@ func TestIntegration(t *testing.T) {
 
 	suite := spec.New("Integration", spec.Report(report.Terminal{}), spec.Parallel())
 	suite("gemfile.lock", testGemfileLock)
+	suite("Ruby2", testRuby2)
 	suite("Default", testDefault)
 	suite("Layer Reuse", testLayerReuse)
 	suite.Run(t)
