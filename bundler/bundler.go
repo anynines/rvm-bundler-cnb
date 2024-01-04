@@ -5,7 +5,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -128,7 +127,7 @@ func InstallBundler(context packit.BuildContext, configuration Configuration, lo
 		rubyMinorCheck := []string{"6", "7"}
 		if bundlerMajorVersion == 1 {
 			rubyGemsVersion = "3.0.8"
-		} else if rubyMajorVersion == rubyMajorCheck && slices.Contains(rubyMinorCheck, rubyMinorVersion) {
+		} else if rubyMajorVersion == rubyMajorCheck && contains(rubyMinorCheck, rubyMinorVersion) {
 			// ruby gems 3.4.22 is the latest with Ruby 2.6 and 2.7 support
 			rubyGemsVersion = "3.4.22"
 		}
@@ -341,4 +340,15 @@ func extractRubyVersion(version string) (string, string, error) {
 	}
 
 	return matches[1], matches[2], nil
+}
+
+// contains checks if a string is present in a slice
+func contains(s []string, str string) bool {
+	for _, v := range s {
+		if v == str {
+			return true
+		}
+	}
+
+	return false
 }
